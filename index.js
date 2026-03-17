@@ -45,3 +45,5 @@ app.post("/stories/publish", async (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Stories Bot rodando na porta " + PORT);
 });
+
+process.on('SIGTERM', () => process.exit(0));
