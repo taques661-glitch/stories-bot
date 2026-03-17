@@ -10,7 +10,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const IG_TOKEN = process.env.IG_TOKEN;
 const IG_ID = process.env.IG_ID;
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
 app.get("/", (req, res) => res.json({ status: "ok", service: "Stories Bot" }));
 
