@@ -20,7 +20,7 @@ const IG_TOKEN = process.env.IG_TOKEN;
 const IG_ID = process.env.IG_ID;
 const PORT = process.env.PORT || 3001;
 
-app.get("/", (req, res) => res.json({ status: "ok" }));
+app.get("/api", (req, res) => res.json({ status: "ok" }));
 app.get("/health", (req, res) => res.sendStatus(200));
 app.get("/accounts", (req, res) => {
   res.json({ accounts: [{ ig_id: IG_ID, username: "ktsmartsam", followers: 0 }] });
