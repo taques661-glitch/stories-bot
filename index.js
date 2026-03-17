@@ -86,4 +86,20 @@ app.post("/stories/publish", upload.single("file"), async (req, res) => {
   }
 });
 
+
+const cron = require('node-cron');
+cron.schedule('* * * * *', async () => {
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const manaus = new Date(now.toLocaleString('en-US', {timeZone:'America/Manaus'}));
+  const dateStr = manaus.getFullYear()+'-'+pad(manaus.getMonth()+1)+'-'+pad(manaus.getDate());
+  const timeStr = pad(manaus.getHours())+':'+pad(manaus.getMinutes());
+  console.log('Cron check:', dateStr, timeStr);
+});
 app.listen(PORT, "0.0.0.0", () => console.log("Stories Bot porta " + PORT));
+
+// Storage de agendamentos
+let scheduled = [];
+app.post('/schedule', (req, res) => { scheduled.push({...req.body, status:'pending'}); res.json({success:true}); });
+app.get('/schedule', (req, res) => { res.json({scheduled}); });
+app.delete('/schedule/:id', (req, res) => { scheduled = scheduled.map(s => s.id==req.params.id?{...s,status:'cancelled'}:s); res.json({success:true}); });
