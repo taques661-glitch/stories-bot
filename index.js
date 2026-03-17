@@ -21,6 +21,7 @@ const upload = multer({
 });
 
 app.use("/uploads", express.static("uploads"));
+app.use(express.static("public"));
 
 app.get("/", (req, res) => res.json({ status: "ok", service: "Stories Bot" }));
 app.get("/health", (req, res) => res.sendStatus(200));
