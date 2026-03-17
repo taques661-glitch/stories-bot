@@ -10,6 +10,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const IG_TOKEN = process.env.IG_TOKEN;
 const IG_ID = process.env.IG_ID;
+const PORT = process.env.PORT || 3001;
+
+app.get("/", (req, res) => res.json({ status: "ok", service: "Stories Bot" }));
 
 app.get("/accounts", (req, res) => {
   res.json({ accounts: [{ ig_id: IG_ID, username: "ktsmartsam", followers: 0 }] });
@@ -39,5 +42,6 @@ app.post("/stories/publish", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log("Stories Bot rodando na porta " + PORT));
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Stories Bot rodando na porta " + PORT);
+});
