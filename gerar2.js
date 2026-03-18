@@ -1,4 +1,7 @@
-<!DOCTYPE html>
+
+const fs = require('fs');
+
+const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -489,4 +492,7 @@ setInterval(()=>{
 render();updateStats();
 </script>
 </body>
-</html>
+</html>`;
+
+fs.writeFileSync('./public/index.html', html);
+console.log('index.html criado! Linhas: ' + html.split('\\n').length);
