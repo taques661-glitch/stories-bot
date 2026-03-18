@@ -184,7 +184,24 @@ app.post("/stories/publish", upload.single("file"), async (req, res) => {
       }
     );
     const containerId = containerRes.data.id;
-    await sleep(isVideo ? 8000 : 3000);
+
+    // Poll until ready
+    if (isVideo) {
+      let ready = false;
+      for (let i = 0; i < 20; i++) {
+        await sleep(5000);
+        const statusRes = await axios.get(
+          `https://graph.facebook.com/v19.0/${containerId}?fields=status_code&access_token=${token}`
+        );
+        const status = statusRes.data.status_code;
+        console.log(`Video status [${i+1}]: ${status}`);
+        if (status === 'FINISHED') { ready = true; break; }
+        if (status === 'ERROR') throw new Error('Video processing failed');
+      }
+      if (!ready) throw new Error('Video processing timeout');
+    } else {
+      await sleep(3000);
+    }
 
     await axios.post(
       `https://graph.facebook.com/v19.0/${igId}/media_publish`,
@@ -216,10 +233,24 @@ setInterval(async () => {
             access_token: IG_TOKEN
           }
         );
-        await sleep(isVideo ? 8000 : 3000);
+        const containerId = containerRes.data.id;
+        if (isVideo) {
+          let ready = false;
+          for (let i = 0; i < 20; i++) {
+            await sleep(5000);
+            const statusRes = await axios.get(
+              `https://graph.facebook.com/v19.0/${containerId}?fields=status_code&access_token=${IG_TOKEN}`
+            );
+            if (statusRes.data.status_code === 'FINISHED') { ready = true; break; }
+            if (statusRes.data.status_code === 'ERROR') throw new Error('Video processing failed');
+          }
+          if (!ready) throw new Error('Video processing timeout');
+        } else {
+          await sleep(3000);
+        }
         await axios.post(
           `https://graph.facebook.com/v19.0/${row.ig_id || IG_ID}/media_publish`,
-          { creation_id: containerRes.data.id, access_token: IG_TOKEN }
+          { creation_id: containerId, access_token: IG_TOKEN }
         );
         await sbUpdate(row.id, { status: "published" });
         console.log(`Published story ${row.id}`);
