@@ -120,7 +120,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .progress-step.pending{background:rgba(255,255,255,0.04);color:var(--text3)}
 .progress-step.uploading{background:var(--gold-dim);color:var(--gold)}
 .progress-step.done{background:var(--green-dim);color:var(--green)}
-.progress-step.fail{background:var(--red-dim);color:var(--red)}background:var(--bg2);border-top:1px solid var(--gold-border);padding:12px 16px;display:flex;align-items:center;gap:10px;z-index:50;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1)}
+.progress-step.fail{background:var(--red-dim);color:var(--red)}
+.bulk-cal-day{height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'Syne',sans-serif;font-weight:700;cursor:pointer;transition:all 0.15s;border:1px solid transparent;color:var(--text3)}
+.bulk-cal-day:hover{background:var(--gold-dim);color:var(--gold)}
+.bulk-cal-day.selected{background:var(--gold);color:#000}
+.bulk-cal-day.today{border-color:var(--gold-border);color:var(--gold)}
+.bulk-cal-day.other,.bulk-cal-day.past{opacity:0.2;pointer-events:none}
+.bulk-assign-row{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)}
+.bulk-assign-thumb{width:32px;height:32px;border-radius:4px;background:var(--bg2);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:14px}
+.bulk-assign-thumb img,.bulk-assign-thumb video{width:100%;height:100%;object-fit:cover}
+.bulk-assign-info{flex:1;min-width:0;font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bulk-assign-date{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--gold)}
+.bulk-assign-time{width:80px;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;font-family:inherit;outline:none}
+.bulk-assign-time:focus{border-color:var(--gold)}background:var(--bg2);border-top:1px solid var(--gold-border);padding:12px 16px;display:flex;align-items:center;gap:10px;z-index:50;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1)}
 .bulk-bar.show{transform:translateY(0)}
 .bulk-count{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--gold)}
 .bulk-actions{display:flex;gap:6px;margin-left:auto}
@@ -404,49 +416,59 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 <!-- MODAL AGENDAR EM LOTE -->
 <div class="modal-overlay" id="modal-bulk" style="display:none" onclick="if(event.target.id==='modal-bulk')closeBulkModal()">
-  <div class="modal" style="max-width:540px">
+  <div class="modal" style="max-width:580px">
     <div class="modal-handle"></div>
     <div class="modal-header">
       <div class="modal-title">📦 Agendar em Lote</div>
       <button class="modal-close" onclick="closeBulkModal()">×</button>
     </div>
-    <div class="form-group">
-      <label class="form-label">Mídias (<span id="bulk-media-count">0</span> selecionadas)</label>
-      <div class="bulk-upload-grid" id="bulk-grid">
-        <div class="bulk-add-btn">
-          <input type="file" id="bulk-file-input" multiple accept="image/jpeg,image/png,video/mp4,video/quicktime" onchange="handleBulkFiles(event)">
-          <div>+</div>
-          <div class="bulk-add-label">Adicionar</div>
+
+    <!-- STEP 1: Mídias -->
+    <div id="bulk-step1">
+      <div class="form-group">
+        <label class="form-label">1. Selecione as mídias</label>
+        <div class="bulk-upload-grid" id="bulk-grid">
+          <div class="bulk-add-btn" id="bulk-add-btn">
+            <input type="file" id="bulk-file-input" multiple accept="image/jpeg,image/png,video/mp4,video/quicktime" onchange="handleBulkFiles(event)">
+            <div style="font-size:22px">+</div>
+            <div class="bulk-add-label">Adicionar</div>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Data inicial</label><input type="date" class="form-input" id="bulk-date"></div>
+
+      <!-- STEP 2: Calendário de dias -->
+      <div class="form-group" id="bulk-cal-section" style="display:none">
+        <label class="form-label">2. Selecione os dias <span style="color:var(--text3);font-weight:400">(clique para marcar)</span></label>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <button class="month-btn" onclick="bulkCalPrev()">‹</button>
+          <span class="month-label" id="bulk-cal-label" style="font-size:11px"></span>
+          <button class="month-btn" onclick="bulkCalNext()">›</button>
+        </div>
+        <div id="bulk-cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
+        <div style="margin-top:6px;font-size:10px;color:var(--text3);font-family:'Syne',sans-serif">
+          <span id="bulk-days-count" style="color:var(--gold);font-weight:700">0 dias</span> selecionados · <span id="bulk-media-count2">0 mídias</span>
+        </div>
+      </div>
+
+      <!-- STEP 3: Atribuição mídia → dia + horário -->
+      <div class="form-group" id="bulk-assign-section" style="display:none">
+        <label class="form-label">3. Horário de cada story</label>
+        <div id="bulk-assign-list" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto"></div>
+      </div>
+
       <div class="form-group">
-        <label class="form-label">Distribuição</label>
-        <select class="form-input" id="bulk-dist">
-          <option value="same">Mesmo dia</option>
-          <option value="daily" selected>1 por dia</option>
-          <option value="weekdays">Dias úteis</option>
-          <option value="custom">Datas customizadas</option>
-        </select>
+        <label class="form-label">Legenda (aplicar a todos)</label>
+        <input type="text" class="form-input" id="bulk-caption" placeholder="Opcional...">
       </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Horários</label>
-      <div class="bulk-time-row" id="bulk-times-row">
-        <div class="bulk-time-chip active" onclick="toggleTimeChip(this,'09:00')">09:00</div>
-        <div class="bulk-time-chip" onclick="toggleTimeChip(this,'12:00')">12:00</div>
-        <div class="bulk-time-chip" onclick="toggleTimeChip(this,'18:00')">18:00</div>
-        <div class="bulk-time-chip" onclick="toggleTimeChip(this,'20:00')">20:00</div>
-        <input type="time" class="form-input" id="bulk-custom-time" style="width:90px;padding:4px 8px;font-size:11px" value="09:00">
+
+      <div class="progress-steps" id="bulk-progress-steps" style="display:none"></div>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeBulkModal()">Cancelar</button>
+        <button class="btn-save" id="btn-bulk-save" onclick="saveBulkStories()" style="opacity:0.4;cursor:not-allowed" disabled>
+          Agendar <span id="bulk-save-label">0</span> Stories
+        </button>
       </div>
-    </div>
-    <div class="form-group"><label class="form-label">Legenda (aplicar a todos)</label><input type="text" class="form-input" id="bulk-caption" placeholder="Opcional..."></div>
-    <div class="progress-steps" id="bulk-progress-steps" style="display:none"></div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeBulkModal()">Cancelar</button>
-      <button class="btn-save" id="btn-bulk-save" onclick="saveBulkStories()">Agendar <span id="bulk-save-label">0</span> Stories</button>
     </div>
   </div>
 </div>
@@ -791,120 +813,148 @@ function dupDay(dstr){
   });
   sv();render();showToast(ss.length+' story(s) duplicado(s) para proxima semana!','success');
 }
-// BULK SCHEDULE
-let bulkFiles=[];
-let bulkTimes=new Set(['09:00']);
+// BULK SCHEDULE v2
+let bulkFiles=[],bulkSelectedDays=new Set(),bulkCalDate=new Date();
 function openBulkModal(){
-  bulkFiles=[];bulkTimes=new Set(['09:00']);
-  document.getElementById('bulk-date').value=ds(new Date());
+  bulkFiles=[];bulkSelectedDays=new Set();bulkCalDate=new Date();
   document.getElementById('bulk-caption').value='';
   document.getElementById('bulk-progress-steps').style.display='none';
-  document.getElementById('btn-bulk-save').disabled=false;
-  document.getElementById('btn-bulk-save').textContent='Agendar 0 Stories';
-  document.querySelectorAll('.bulk-time-chip').forEach(c=>c.classList.toggle('active',c.textContent==='09:00'));
-  renderBulkGrid();
+  document.getElementById('bulk-cal-section').style.display='none';
+  document.getElementById('bulk-assign-section').style.display='none';
+  document.getElementById('btn-bulk-save').disabled=true;
+  document.getElementById('btn-bulk-save').style.opacity='0.4';
+  document.getElementById('bulk-save-label').textContent='0';
+  renderBulkGrid();renderBulkCal();
   document.getElementById('modal-bulk').style.display='flex';
 }
-function closeBulkModal(){document.getElementById('modal-bulk').style.display='none';bulkFiles=[];}
+function closeBulkModal(){document.getElementById('modal-bulk').style.display='none';bulkFiles=[];bulkSelectedDays=new Set();}
 function renderBulkGrid(){
   const grid=document.getElementById('bulk-grid');
-  // keep the add button
-  const addBtn=grid.querySelector('.bulk-add-btn');
+  const addBtn=document.getElementById('bulk-add-btn')||grid.lastElementChild;
   grid.innerHTML='';
   bulkFiles.forEach((f,i)=>{
     const thumb=document.createElement('div');thumb.className='bulk-thumb';
-    if(f.type&&f.type.includes('video')){
-      const v=document.createElement('video');v.src=f.previewUrl;v.muted=true;thumb.appendChild(v);
-    } else {
-      const img=document.createElement('img');img.src=f.previewUrl||f.url;thumb.appendChild(img);
-    }
+    if(f.type&&f.type.includes('video')){const v=document.createElement('video');v.src=f.previewUrl;v.muted=true;thumb.appendChild(v);}
+    else{const img=document.createElement('img');img.src=f.previewUrl;thumb.appendChild(img);}
     const rm=document.createElement('button');rm.className='remove-btn';rm.textContent='×';
-    rm.onclick=()=>{URL.revokeObjectURL(bulkFiles[i].previewUrl);bulkFiles.splice(i,1);renderBulkGrid();updateBulkSaveLabel();};
-    const tt=document.createElement('div');tt.className='thumb-time';tt.textContent=(i+1)+'/'+bulkFiles.length;
-    thumb.appendChild(rm);thumb.appendChild(tt);
-    grid.appendChild(thumb);
+    rm.onclick=()=>{URL.revokeObjectURL(bulkFiles[i].previewUrl);bulkFiles.splice(i,1);renderBulkGrid();updateBulkState();};
+    thumb.appendChild(rm);grid.appendChild(thumb);
   });
-  grid.appendChild(addBtn);
-  document.getElementById('bulk-media-count').textContent=bulkFiles.length;
+  const ab=document.createElement('div');ab.className='bulk-add-btn';ab.id='bulk-add-btn';
+  const inp=document.createElement('input');inp.type='file';inp.id='bulk-file-input';inp.className='upload-input';inp.multiple=true;inp.accept='image/jpeg,image/png,video/mp4,video/quicktime';inp.onchange=handleBulkFiles;
+  ab.innerHTML='<div style="font-size:22px;pointer-events:none">+</div><div class="bulk-add-label" style="pointer-events:none">Adicionar</div>';
+  ab.appendChild(inp);grid.appendChild(ab);
+  updateBulkState();
 }
-function updateBulkSaveLabel(){
-  const n=bulkFiles.length;
-  document.getElementById('bulk-save-label').textContent=n;
-  document.getElementById('btn-bulk-save').querySelector?.()||null;
-  document.getElementById('btn-bulk-save').textContent='Agendar '+n+' Stories';
+function updateBulkState(){
+  const nf=bulkFiles.length,nd=bulkSelectedDays.size;
+  document.getElementById('bulk-cal-section').style.display=nf>0?'block':'none';
+  document.getElementById('bulk-days-count').textContent=nd+' dia'+(nd!==1?'s':'');
+  document.getElementById('bulk-media-count2').textContent=nf+' mídia'+(nf!==1?'s':'');
+  if(nf>0&&nd>0){
+    document.getElementById('bulk-assign-section').style.display='block';
+    renderBulkAssign();
+  } else {
+    document.getElementById('bulk-assign-section').style.display='none';
+  }
+  const ready=nf>0&&nd>0;
+  document.getElementById('btn-bulk-save').disabled=!ready;
+  document.getElementById('btn-bulk-save').style.opacity=ready?'1':'0.4';
+  document.getElementById('btn-bulk-save').style.cursor=ready?'pointer':'not-allowed';
+  // calculate total stories = files × days (or distribute)
+  const total=Math.min(nf,nd)*Math.ceil(nf/Math.max(nd,1))||nf;
+  document.getElementById('bulk-save-label').textContent=nf;
+}
+function renderBulkAssign(){
+  const list=document.getElementById('bulk-assign-list');list.innerHTML='';
+  const days=[...bulkSelectedDays].sort();
+  // distribute files across days
+  bulkFiles.forEach((f,i)=>{
+    const day=days[i%days.length]||days[0];
+    const row=document.createElement('div');row.className='bulk-assign-row';
+    const thumb=document.createElement('div');thumb.className='bulk-assign-thumb';
+    if(f.type&&f.type.includes('video')){const v=document.createElement('video');v.src=f.previewUrl;v.muted=true;thumb.appendChild(v);}
+    else{const img=document.createElement('img');img.src=f.previewUrl;thumb.appendChild(img);}
+    const info=document.createElement('div');info.className='bulk-assign-info';info.textContent='Mídia '+(i+1);
+    const dateLabel=document.createElement('div');dateLabel.className='bulk-assign-date';
+    const dd=new Date(day+'T12:00:00');dateLabel.textContent=dd.getDate()+'/'+String(dd.getMonth()+1).padStart(2,'0');
+    const timeInp=document.createElement('input');timeInp.type='time';timeInp.className='bulk-assign-time';
+    timeInp.value=f.time||'09:00';
+    timeInp.onchange=e=>{bulkFiles[i].time=e.target.value;bulkFiles[i].assignedDay=day;};
+    bulkFiles[i].assignedDay=day;
+    if(!bulkFiles[i].time)bulkFiles[i].time='09:00';
+    row.appendChild(thumb);row.appendChild(info);row.appendChild(dateLabel);row.appendChild(timeInp);
+    list.appendChild(row);
+  });
 }
 async function handleBulkFiles(e){
   const files=Array.from(e.target.files);
   for(const f of files){
-    bulkFiles.push({file:f,type:f.type,previewUrl:URL.createObjectURL(f),url:null,uploading:false});
+    bulkFiles.push({file:f,type:f.type,previewUrl:URL.createObjectURL(f),url:null,time:'09:00',assignedDay:null});
   }
-  renderBulkGrid();updateBulkSaveLabel();
-  e.target.value='';
+  renderBulkGrid();e.target.value='';
 }
-function toggleTimeChip(el,time){
-  if(bulkTimes.has(time)){if(bulkTimes.size>1){bulkTimes.delete(time);el.classList.remove('active');}}
-  else{bulkTimes.add(time);el.classList.add('active');}
+function bulkCalPrev(){bulkCalDate.setMonth(bulkCalDate.getMonth()-1);renderBulkCal();}
+function bulkCalNext(){bulkCalDate.setMonth(bulkCalDate.getMonth()+1);renderBulkCal();}
+function renderBulkCal(){
+  const y=bulkCalDate.getFullYear(),m=bulkCalDate.getMonth();
+  document.getElementById('bulk-cal-label').textContent=MO[m]+' '+y;
+  const grid=document.getElementById('bulk-cal-grid');grid.innerHTML='';
+  // headers
+  DY.forEach(d=>{const h=document.createElement('div');h.style.cssText='text-align:center;font-size:8px;color:var(--text3);font-family:Syne,sans-serif;padding:3px 0;font-weight:700;letter-spacing:1px';h.textContent=d;grid.appendChild(h);});
+  const fd=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),dip=new Date(y,m,0).getDate();
+  const todayStr=ds(new Date());
+  const addDay=(date,other)=>{
+    const dstr=ds(date);
+    const isPast=dstr<todayStr;
+    const el=document.createElement('div');
+    el.className='bulk-cal-day'+(other?' other':'')+(isPast?' past':'')+(dstr===todayStr?' today':'')+(bulkSelectedDays.has(dstr)?' selected':'');
+    el.textContent=date.getDate();
+    if(!other&&!isPast)el.onclick=()=>{
+      if(bulkSelectedDays.has(dstr))bulkSelectedDays.delete(dstr);
+      else bulkSelectedDays.add(dstr);
+      renderBulkCal();updateBulkState();
+    };
+    grid.appendChild(el);
+  };
+  for(let i=0;i<fd;i++)addDay(new Date(y,m-1,dip-fd+i+1),true);
+  for(let d=1;d<=dim;d++)addDay(new Date(y,m,d),false);
+  const rem=42-fd-dim;for(let d=1;d<=rem;d++)addDay(new Date(y,m+1,d),true);
 }
-function addDaysSafe(dateStr,n){const d=new Date(dateStr+'T12:00:00');d.setDate(d.getDate()+n);return ds(d);}
 async function saveBulkStories(){
-  if(!bulkFiles.length){showToast('Adicione pelo menos 1 mídia!',true);return;}
-  const btn=document.getElementById('btn-bulk-save');
-  btn.disabled=true;
-  const startDate=document.getElementById('bulk-date').value;
-  const dist=document.getElementById('bulk-dist').value;
+  if(!bulkFiles.length||!bulkSelectedDays.size)return;
+  const btn=document.getElementById('btn-bulk-save');btn.disabled=true;btn.style.opacity='0.6';
   const caption=document.getElementById('bulk-caption').value;
-  const times=[...bulkTimes];
-  const customTime=document.getElementById('bulk-custom-time').value;
-  const allTimes=times.length?times:[customTime||'09:00'];
-  // Calculate dates for each file
-  const assignments=[];
-  let datePtr=startDate;
-  for(let i=0;i<bulkFiles.length;i++){
-    const time=allTimes[i%allTimes.length];
-    assignments.push({file:bulkFiles[i],date:datePtr,time});
-    // advance date
-    if(dist==='same'){}
-    else if(dist==='daily'){datePtr=addDaysSafe(datePtr,1);}
-    else if(dist==='weekdays'){
-      let next=new Date(datePtr+'T12:00:00');
-      do{next.setDate(next.getDate()+1);}while(next.getDay()===0||next.getDay()===6);
-      datePtr=ds(next);
-    }
-  }
-  // show progress
-  const stepsEl=document.getElementById('bulk-progress-steps');
-  stepsEl.style.display='flex';stepsEl.innerHTML='';
-  const stepEls=assignments.map((a,i)=>{
-    const s=document.createElement('div');s.className='progress-step pending';s.textContent=(i+1)+'. '+a.date+' '+a.time;
+  const stepsEl=document.getElementById('bulk-progress-steps');stepsEl.style.display='flex';stepsEl.innerHTML='';
+  const stepEls=bulkFiles.map((f,i)=>{
+    const s=document.createElement('div');s.className='progress-step pending';
+    const dd=new Date((f.assignedDay||ds(new Date()))+'T12:00:00');
+    s.textContent=(i+1)+'. '+dd.getDate()+'/'+String(dd.getMonth()+1).padStart(2,'0')+' '+f.time;
     stepsEl.appendChild(s);return s;
   });
-  // upload and schedule each
   let ok=0,fail=0;
-  for(let i=0;i<assignments.length;i++){
-    const {file:bf,date,time}=assignments[i];
-    stepEls[i].className='progress-step uploading';stepEls[i].textContent='⏳ '+(i+1)+'. '+date+' '+time;
-    let mediaUrl=bf.url;
-    let mediaType=bf.type&&bf.type.includes('video')?'VIDEO':'IMAGE';
+  for(let i=0;i<bulkFiles.length;i++){
+    const bf=bulkFiles[i];
+    stepEls[i].className='progress-step uploading';
+    let mediaUrl=bf.url,mediaType=bf.type&&bf.type.includes('video')?'VIDEO':'IMAGE';
     if(!mediaUrl){
       try{
         const fd=new FormData();fd.append('file',bf.file);fd.append('ig_id',IG_ID);
         const r=await fetch(API+'/upload',{method:'POST',body:fd});
         const d=await r.json();
-        if(d.url){mediaUrl=d.url;mediaType=d.mediaType||mediaType;bf.url=d.url;}
-        else throw new Error('upload failed');
-      }catch(e){stepEls[i].className='progress-step fail';stepEls[i].textContent='✕ '+(i+1)+'. '+date;fail++;continue;}
+        if(d.url){mediaUrl=d.url;mediaType=d.mediaType||mediaType;}
+        else throw new Error('fail');
+      }catch(e){stepEls[i].className='progress-step fail';fail++;continue;}
     }
-    const story={id:Date.now()+i,url:mediaUrl,date,time,caption,repeat:'none',status:'scheduled',mediaType,link:'',ig_id:IG_ID};
+    const story={id:Date.now()+i*7,url:mediaUrl,date:bf.assignedDay||ds(new Date()),time:bf.time||'09:00',caption,repeat:'none',status:'scheduled',mediaType,link:'',ig_id:IG_ID};
     S.push(story);
     try{fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(story)});}catch(e){}
-    stepEls[i].className='progress-step done';stepEls[i].textContent='✓ '+(i+1)+'. '+date+' '+time;
-    ok++;
+    stepEls[i].className='progress-step done';ok++;
   }
-  sv();
-  if(activeFilter!==null)renderList(activeFilter);else render();
+  sv();if(activeFilter!==null)renderList(activeFilter);else render();
   showToast(ok+' stories agendados'+(fail?' ('+fail+' erros)':'')+'!','success');
-  btn.disabled=false;
-  setTimeout(()=>closeBulkModal(),1500);
+  btn.disabled=false;btn.style.opacity='1';
+  setTimeout(()=>closeBulkModal(),1800);
 }
 // END BULK SCHEDULE
 function openPublishNow(){
