@@ -228,7 +228,11 @@ app.post("/stories/publish", upload.single("file"), async (req, res) => {
           {
             resource_type: isVideo ? "video" : "image",
             folder: "stories_tfx",
-            ...(isVideo ? { format: "mp4", transformation: [{ fetch_format: "mp4", quality: "auto:good", bit_rate: "2m", width: 1080, height: 1920, crop: "limit" }] } : {})
+            ...(isVideo ? {
+              format: "mp4",
+              eager: [{ fetch_format: "mp4", quality: "auto:good", bit_rate: "2m", width: 1080, height: 1920, crop: "limit" }],
+              eager_async: true
+            } : {})
           },
           (err, r) => err ? reject(err) : resolve(r)
         );
