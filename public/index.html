@@ -631,22 +631,13 @@ async function handlePublishFileSelect(e){
     const r=await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,{method:'POST',body:fd});
     const d=await r.json();
     if(d.error){showToast('Erro: '+d.error.message,true);return;}
-    let uploadedUrl=d.secure_url;
-    if(isVid && d.public_id){
-      showToast('Convertendo vídeo...');
-      for(let i=0;i<24;i++){
-        await new Promise(res=>setTimeout(res,5000));
-        try{
-          const chk=await fetch(`https://res.cloudinary.com/${cloudName}/video/upload/c_limit,w_1080,h_1920,q_auto:good,br_2m/${d.public_id}.mp4`,{method:'HEAD'});
-          if(chk.ok){uploadedUrl=`https://res.cloudinary.com/${cloudName}/video/upload/c_limit,w_1080,h_1920,q_auto:good,br_2m/${d.public_id}.mp4`;break;}
-        }catch(e){}
-      }
-    }
+    // Usa URL direta — servidor cuida da conversão ao publicar
+    const uploadedUrl=d.secure_url;
     pubFile=null;
     document.getElementById('pnow-url').value=uploadedUrl;
     document.getElementById('pnow-section-url').style.display='block';
     document.getElementById('pnow-section-upload').style.display='none';
-    showToast('Upload concluído!','success');
+    showToast('Upload concluído! Clique em Publicar Agora.','success');
   }catch(e2){showToast('Erro no upload: '+e2.message,true);}
 }
 function switchNav(v){
