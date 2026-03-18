@@ -167,6 +167,8 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         {
           resource_type: isVideo ? "video" : "image",
           folder: "stories_tfx",
+          // FIX: converte MOV/outros para MP4 (Instagram só aceita MP4)
+          ...(isVideo ? { format: "mp4", transformation: [{ fetch_format: "mp4" }] } : {}),
           // FIX: garante que o Cloudinary não aplique transformações automáticas
           eager_async: false
         },
@@ -197,6 +199,8 @@ app.post("/stories/publish", upload.single("file"), async (req, res) => {
       const result = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
           { resource_type: isVideo ? "video" : "image", folder: "stories_tfx" },
+          // FIX: converte MOV/outros para MP4 (Instagram só aceita MP4)
+          ...(isVideo ? { format: "mp4", transformation: [{ fetch_format: "mp4" }] } : {}),
           (err, r) => err ? reject(err) : resolve(r)
         );
         stream.end(req.file.buffer);
