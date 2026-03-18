@@ -64,7 +64,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .day-cell.has-stories{border-color:rgba(232,200,74,0.18)}
 .day-number{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px}
 .day-cell.today .day-number{color:var(--gold)}
-.story-pill{display:flex;align-items:center;gap:3px;padding:2px 5px;border-radius:3px;margin-bottom:2px;font-size:8px;font-weight:500;cursor:pointer;white-space:nowrap;overflow:hidden;border-left:2px solid}
+.story-pill{display:flex;align-items:center;gap:3px;padding:2px 5px;border-radius:3px;margin-bottom:2px;font-size:8px;font-weight:500;white-space:nowrap;overflow:hidden;border-left:2px solid;cursor:pointer;position:relative}
+.story-pill:hover .pill-actions{display:flex}
+.pill-actions{display:none;position:absolute;right:2px;top:50%;transform:translateY(-50%);gap:1px;background:inherit;padding-left:2px}
+.pill-btn{width:14px;height:14px;border-radius:2px;border:none;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.pill-btn.edit{background:rgba(255,255,255,0.15);color:inherit}
+.pill-btn.del{background:rgba(248,113,113,0.3);color:#f87171}
 .story-pill.scheduled,.story-pill.pending{background:var(--gold-dim);color:var(--gold);border-color:var(--gold)}
 .story-pill.published{background:var(--green-dim);color:var(--green);border-color:var(--green)}
 .story-pill.error{background:var(--red-dim);color:var(--red);border-color:var(--red)}
@@ -97,7 +102,25 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .list-item.selected{border-color:var(--gold);background:var(--gold-dim)}
 .list-cb{width:16px;height:16px;border-radius:4px;border:1px solid var(--border);background:rgba(255,255,255,0.04);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;font-size:10px}
 .list-cb.checked{background:var(--gold);border-color:var(--gold);color:#000}
-.bulk-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--gold-border);padding:12px 16px;display:flex;align-items:center;gap:10px;z-index:50;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1)}
+.bulk-upload-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;margin-top:8px;max-height:200px;overflow-y:auto}
+.bulk-thumb{width:70px;height:70px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:20px}
+.bulk-thumb img,.bulk-thumb video{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+.bulk-thumb .remove-btn{position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(248,113,113,0.9);border:none;color:white;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
+.bulk-thumb .thumb-time{position:absolute;bottom:2px;left:2px;right:2px;background:rgba(0,0,0,0.7);border-radius:2px;font-size:7px;color:white;text-align:center;font-family:'Syne',sans-serif;padding:1px 2px}
+.bulk-add-btn{width:70px;height:70px;border-radius:6px;background:rgba(255,255,255,0.02);border:2px dashed rgba(255,255,255,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--text3);font-size:20px;transition:all 0.15s;position:relative}
+.bulk-add-btn:hover{border-color:var(--gold-border);color:var(--gold);background:var(--gold-dim)}
+.bulk-add-btn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.bulk-add-label{font-size:8px;font-family:'Syne',sans-serif;margin-top:2px}
+.bulk-time-row{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.bulk-time-chip{padding:4px 10px;border-radius:20px;font-size:10px;font-family:'Syne',sans-serif;font-weight:700;background:var(--bg3);border:1px solid var(--border);color:var(--text2);cursor:pointer;transition:all 0.15s}
+.bulk-time-chip.active{background:var(--gold-dim);border-color:var(--gold);color:var(--gold)}
+.bulk-time-chip.custom{display:flex;align-items:center;gap:4px}
+.progress-steps{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+.progress-step{padding:2px 6px;border-radius:3px;font-size:9px;font-family:'Syne',sans-serif;font-weight:600}
+.progress-step.pending{background:rgba(255,255,255,0.04);color:var(--text3)}
+.progress-step.uploading{background:var(--gold-dim);color:var(--gold)}
+.progress-step.done{background:var(--green-dim);color:var(--green)}
+.progress-step.fail{background:var(--red-dim);color:var(--red)}background:var(--bg2);border-top:1px solid var(--gold-border);padding:12px 16px;display:flex;align-items:center;gap:10px;z-index:50;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1)}
 .bulk-bar.show{transform:translateY(0)}
 .bulk-count{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--gold)}
 .bulk-actions{display:flex;gap:6px;margin-left:auto}
@@ -236,6 +259,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <div class="month-label" id="period-label">Marco 2026</div>
           <button class="month-btn" onclick="nextPeriod()">&#8250;</button>
         </div>
+        <button class="btn-add" onclick="openBulkModal()" style="background:var(--bg3);color:var(--gold);border:1px solid var(--gold-border)">📦 Lote</button>
         <button class="btn-add" onclick="openModal()">+ Novo</button>
       </div>
     </div>
@@ -378,6 +402,55 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
+<!-- MODAL AGENDAR EM LOTE -->
+<div class="modal-overlay" id="modal-bulk" style="display:none" onclick="if(event.target.id==='modal-bulk')closeBulkModal()">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">📦 Agendar em Lote</div>
+      <button class="modal-close" onclick="closeBulkModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Mídias (<span id="bulk-media-count">0</span> selecionadas)</label>
+      <div class="bulk-upload-grid" id="bulk-grid">
+        <div class="bulk-add-btn">
+          <input type="file" id="bulk-file-input" multiple accept="image/jpeg,image/png,video/mp4,video/quicktime" onchange="handleBulkFiles(event)">
+          <div>+</div>
+          <div class="bulk-add-label">Adicionar</div>
+        </div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Data inicial</label><input type="date" class="form-input" id="bulk-date"></div>
+      <div class="form-group">
+        <label class="form-label">Distribuição</label>
+        <select class="form-input" id="bulk-dist">
+          <option value="same">Mesmo dia</option>
+          <option value="daily" selected>1 por dia</option>
+          <option value="weekdays">Dias úteis</option>
+          <option value="custom">Datas customizadas</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Horários</label>
+      <div class="bulk-time-row" id="bulk-times-row">
+        <div class="bulk-time-chip active" onclick="toggleTimeChip(this,'09:00')">09:00</div>
+        <div class="bulk-time-chip" onclick="toggleTimeChip(this,'12:00')">12:00</div>
+        <div class="bulk-time-chip" onclick="toggleTimeChip(this,'18:00')">18:00</div>
+        <div class="bulk-time-chip" onclick="toggleTimeChip(this,'20:00')">20:00</div>
+        <input type="time" class="form-input" id="bulk-custom-time" style="width:90px;padding:4px 8px;font-size:11px" value="09:00">
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Legenda (aplicar a todos)</label><input type="text" class="form-input" id="bulk-caption" placeholder="Opcional..."></div>
+    <div class="progress-steps" id="bulk-progress-steps" style="display:none"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeBulkModal()">Cancelar</button>
+      <button class="btn-save" id="btn-bulk-save" onclick="saveBulkStories()">Agendar <span id="bulk-save-label">0</span> Stories</button>
+    </div>
+  </div>
+</div>
+
 <div class="bulk-bar" id="bulk-bar">
   <span class="bulk-count" id="bulk-count">0 selecionados</span>
   <div class="bulk-actions">
@@ -506,8 +579,17 @@ function mkCell(date,other){
   }
   ss.slice(0,3).forEach(s=>{
     const p=document.createElement('div');p.className='story-pill '+s.status;
-    p.textContent=s.time+' '+(s.mediaType==='VIDEO'?'V ':'')+( s.caption||'Story').substring(0,8);
-    p.onclick=e=>{e.stopPropagation();openEdit(s);};cell.appendChild(p);
+    const txt=document.createElement('span');txt.style.cssText='overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0';
+    txt.textContent=s.time+' '+(s.mediaType==='VIDEO'?'V ':'')+( s.caption||'Story').substring(0,8);
+    p.appendChild(txt);
+    const pa=document.createElement('div');pa.className='pill-actions';
+    const eb=document.createElement('button');eb.className='pill-btn edit';eb.textContent='✎';eb.title='Editar';
+    eb.onclick=e=>{e.stopPropagation();openEdit(s);};
+    const db=document.createElement('button');db.className='pill-btn del';db.textContent='✕';db.title='Excluir';
+    db.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){S=S.filter(x=>x.id!==s.id);sv();render();}};
+    pa.appendChild(eb);pa.appendChild(db);p.appendChild(pa);
+    p.onclick=e=>{if(e.target===p||e.target===txt)openEdit(s);};
+    cell.appendChild(p);
   });
   if(ss.length>3){const more=document.createElement('div');more.className='more-pill';more.textContent='+'+(ss.length-3)+' mais';cell.appendChild(more);}
   if(!other){
@@ -709,6 +791,122 @@ function dupDay(dstr){
   });
   sv();render();showToast(ss.length+' story(s) duplicado(s) para proxima semana!','success');
 }
+// BULK SCHEDULE
+let bulkFiles=[];
+let bulkTimes=new Set(['09:00']);
+function openBulkModal(){
+  bulkFiles=[];bulkTimes=new Set(['09:00']);
+  document.getElementById('bulk-date').value=ds(new Date());
+  document.getElementById('bulk-caption').value='';
+  document.getElementById('bulk-progress-steps').style.display='none';
+  document.getElementById('btn-bulk-save').disabled=false;
+  document.getElementById('btn-bulk-save').textContent='Agendar 0 Stories';
+  document.querySelectorAll('.bulk-time-chip').forEach(c=>c.classList.toggle('active',c.textContent==='09:00'));
+  renderBulkGrid();
+  document.getElementById('modal-bulk').style.display='flex';
+}
+function closeBulkModal(){document.getElementById('modal-bulk').style.display='none';bulkFiles=[];}
+function renderBulkGrid(){
+  const grid=document.getElementById('bulk-grid');
+  // keep the add button
+  const addBtn=grid.querySelector('.bulk-add-btn');
+  grid.innerHTML='';
+  bulkFiles.forEach((f,i)=>{
+    const thumb=document.createElement('div');thumb.className='bulk-thumb';
+    if(f.type&&f.type.includes('video')){
+      const v=document.createElement('video');v.src=f.previewUrl;v.muted=true;thumb.appendChild(v);
+    } else {
+      const img=document.createElement('img');img.src=f.previewUrl||f.url;thumb.appendChild(img);
+    }
+    const rm=document.createElement('button');rm.className='remove-btn';rm.textContent='×';
+    rm.onclick=()=>{URL.revokeObjectURL(bulkFiles[i].previewUrl);bulkFiles.splice(i,1);renderBulkGrid();updateBulkSaveLabel();};
+    const tt=document.createElement('div');tt.className='thumb-time';tt.textContent=(i+1)+'/'+bulkFiles.length;
+    thumb.appendChild(rm);thumb.appendChild(tt);
+    grid.appendChild(thumb);
+  });
+  grid.appendChild(addBtn);
+  document.getElementById('bulk-media-count').textContent=bulkFiles.length;
+}
+function updateBulkSaveLabel(){
+  const n=bulkFiles.length;
+  document.getElementById('bulk-save-label').textContent=n;
+  document.getElementById('btn-bulk-save').querySelector?.()||null;
+  document.getElementById('btn-bulk-save').textContent='Agendar '+n+' Stories';
+}
+async function handleBulkFiles(e){
+  const files=Array.from(e.target.files);
+  for(const f of files){
+    bulkFiles.push({file:f,type:f.type,previewUrl:URL.createObjectURL(f),url:null,uploading:false});
+  }
+  renderBulkGrid();updateBulkSaveLabel();
+  e.target.value='';
+}
+function toggleTimeChip(el,time){
+  if(bulkTimes.has(time)){if(bulkTimes.size>1){bulkTimes.delete(time);el.classList.remove('active');}}
+  else{bulkTimes.add(time);el.classList.add('active');}
+}
+function addDaysSafe(dateStr,n){const d=new Date(dateStr+'T12:00:00');d.setDate(d.getDate()+n);return ds(d);}
+async function saveBulkStories(){
+  if(!bulkFiles.length){showToast('Adicione pelo menos 1 mídia!',true);return;}
+  const btn=document.getElementById('btn-bulk-save');
+  btn.disabled=true;
+  const startDate=document.getElementById('bulk-date').value;
+  const dist=document.getElementById('bulk-dist').value;
+  const caption=document.getElementById('bulk-caption').value;
+  const times=[...bulkTimes];
+  const customTime=document.getElementById('bulk-custom-time').value;
+  const allTimes=times.length?times:[customTime||'09:00'];
+  // Calculate dates for each file
+  const assignments=[];
+  let datePtr=startDate;
+  for(let i=0;i<bulkFiles.length;i++){
+    const time=allTimes[i%allTimes.length];
+    assignments.push({file:bulkFiles[i],date:datePtr,time});
+    // advance date
+    if(dist==='same'){}
+    else if(dist==='daily'){datePtr=addDaysSafe(datePtr,1);}
+    else if(dist==='weekdays'){
+      let next=new Date(datePtr+'T12:00:00');
+      do{next.setDate(next.getDate()+1);}while(next.getDay()===0||next.getDay()===6);
+      datePtr=ds(next);
+    }
+  }
+  // show progress
+  const stepsEl=document.getElementById('bulk-progress-steps');
+  stepsEl.style.display='flex';stepsEl.innerHTML='';
+  const stepEls=assignments.map((a,i)=>{
+    const s=document.createElement('div');s.className='progress-step pending';s.textContent=(i+1)+'. '+a.date+' '+a.time;
+    stepsEl.appendChild(s);return s;
+  });
+  // upload and schedule each
+  let ok=0,fail=0;
+  for(let i=0;i<assignments.length;i++){
+    const {file:bf,date,time}=assignments[i];
+    stepEls[i].className='progress-step uploading';stepEls[i].textContent='⏳ '+(i+1)+'. '+date+' '+time;
+    let mediaUrl=bf.url;
+    let mediaType=bf.type&&bf.type.includes('video')?'VIDEO':'IMAGE';
+    if(!mediaUrl){
+      try{
+        const fd=new FormData();fd.append('file',bf.file);fd.append('ig_id',IG_ID);
+        const r=await fetch(API+'/upload',{method:'POST',body:fd});
+        const d=await r.json();
+        if(d.url){mediaUrl=d.url;mediaType=d.mediaType||mediaType;bf.url=d.url;}
+        else throw new Error('upload failed');
+      }catch(e){stepEls[i].className='progress-step fail';stepEls[i].textContent='✕ '+(i+1)+'. '+date;fail++;continue;}
+    }
+    const story={id:Date.now()+i,url:mediaUrl,date,time,caption,repeat:'none',status:'scheduled',mediaType,link:'',ig_id:IG_ID};
+    S.push(story);
+    try{fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(story)});}catch(e){}
+    stepEls[i].className='progress-step done';stepEls[i].textContent='✓ '+(i+1)+'. '+date+' '+time;
+    ok++;
+  }
+  sv();
+  if(activeFilter!==null)renderList(activeFilter);else render();
+  showToast(ok+' stories agendados'+(fail?' ('+fail+' erros)':'')+'!','success');
+  btn.disabled=false;
+  setTimeout(()=>closeBulkModal(),1500);
+}
+// END BULK SCHEDULE
 function openPublishNow(){
   pubFile=null;document.getElementById('pnow-url').value='';
   document.getElementById('pnow-frame-img').style.display='none';
