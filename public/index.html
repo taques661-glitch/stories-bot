@@ -68,10 +68,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .story-pill.scheduled,.story-pill.pending{background:var(--gold-dim);color:var(--gold);border-color:var(--gold)}
 .story-pill.published{background:var(--green-dim);color:var(--green);border-color:var(--green)}
 .story-pill.error{background:var(--red-dim);color:var(--red);border-color:var(--red)}
-.day-actions{position:absolute;top:4px;right:4px;display:none;gap:2px}
-.day-cell:hover .day-actions{display:flex}
-.day-action-btn{width:20px;height:20px;border-radius:4px;background:rgba(255,255,255,0.06);border:none;color:var(--text3);font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;font-family:'Syne',sans-serif;font-weight:700}
-.day-action-btn:hover{background:var(--gold-dim);color:var(--gold)}
+.day-actions{position:absolute;top:4px;right:4px;display:flex;gap:2px}
+.day-action-btn{width:18px;height:18px;border-radius:3px;background:var(--gold-dim);border:1px solid var(--gold-border);color:var(--gold);font-size:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;font-family:'Syne',sans-serif;font-weight:700}
+.day-action-btn:hover{background:var(--gold);color:#000}
 .add-btn{width:20px;height:20px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.08);color:var(--text3);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:3px;transition:all 0.15s}
 .day-cell:hover .add-btn{border-color:var(--gold-border);color:var(--gold)}
 .more-pill{font-size:8px;color:var(--text3);padding:1px 4px;background:rgba(255,255,255,0.04);border-radius:3px;margin-top:1px;display:inline-block}
@@ -95,6 +94,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .list-section-title{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
 .list-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;cursor:pointer;transition:all 0.15s}
 .list-item:hover{border-color:var(--gold-border);background:var(--bg3)}
+.list-item.selected{border-color:var(--gold);background:var(--gold-dim)}
+.list-cb{width:16px;height:16px;border-radius:4px;border:1px solid var(--border);background:rgba(255,255,255,0.04);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;font-size:10px}
+.list-cb.checked{background:var(--gold);border-color:var(--gold);color:#000}
+.bulk-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--gold-border);padding:12px 16px;display:flex;align-items:center;gap:10px;z-index:50;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1)}
+.bulk-bar.show{transform:translateY(0)}
+.bulk-count{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--gold)}
+.bulk-actions{display:flex;gap:6px;margin-left:auto}
+.bulk-btn{padding:7px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;border:none;transition:all 0.15s}
+.bulk-btn.reschedule{background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold-border)}
+.bulk-btn.reschedule:hover{background:var(--gold);color:#000}
+.bulk-btn.delete{background:var(--red-dim);color:var(--red);border:1px solid rgba(248,113,113,0.2)}
+.bulk-btn.delete:hover{background:rgba(248,113,113,0.2)}
+.bulk-btn.cancel{background:rgba(255,255,255,0.04);color:var(--text2);border:1px solid var(--border)}
+.select-all-row{display:flex;align-items:center;gap:8px;padding:6px 12px;margin-bottom:6px;cursor:pointer}
+.select-all-label{font-size:11px;color:var(--text3);font-family:'Syne',sans-serif;font-weight:600}
 .list-thumb{width:34px;height:60px;border-radius:4px;background:var(--bg3);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden}
 .list-thumb img{width:100%;height:100%;object-fit:cover}
 .list-info{flex:1;min-width:0}
@@ -364,6 +378,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
+<div class="bulk-bar" id="bulk-bar">
+  <span class="bulk-count" id="bulk-count">0 selecionados</span>
+  <div class="bulk-actions">
+    <button class="bulk-btn reschedule" onclick="bulkReschedule()">⏰ Reagendar</button>
+    <button class="bulk-btn delete" onclick="bulkDelete()">✕ Excluir</button>
+    <button class="bulk-btn cancel" onclick="clearSelection()">Cancelar</button>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -371,7 +393,7 @@ const API='https://stories-bot-s4r5.onrender.com';
 const IG_ID='34374106182233912';
 const MO=['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DY=['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
-let cur=new Date(),view='month',editing=null,selFile=null,pubFile=null,activeFilter=null;
+let cur=new Date(),view='month',editing=null,selFile=null,pubFile=null,activeFilter=null,selected=new Set();
 let S=JSON.parse(localStorage.getItem('sb_tfx_v1')||'[]');
 if(!S.length){
   const n=new Date(),y=n.getFullYear(),m=String(n.getMonth()+1).padStart(2,'0'),d=n.getDate();
@@ -479,7 +501,7 @@ function mkCell(date,other){
   const n=document.createElement('div');n.className='day-number';n.textContent=date.getDate();cell.appendChild(n);
   if(!other&&ss.length){
     const acts=document.createElement('div');acts.className='day-actions';
-    const dup=document.createElement('button');dup.className='day-action-btn';dup.title='Duplicar semana';dup.textContent='D';
+    const dup=document.createElement('button');dup.className='day-action-btn';dup.title='Duplicar para proxima semana';dup.textContent='D';
     dup.onclick=e=>{e.stopPropagation();dupDay(dstr);};acts.appendChild(dup);cell.appendChild(acts);
   }
   ss.slice(0,3).forEach(s=>{
@@ -528,11 +550,46 @@ function renderWeek(){
   }
   body.appendChild(grid);wrap.appendChild(body);c.appendChild(wrap);
 }
+function updateBulkBar(){
+  const n=selected.size;
+  document.getElementById('bulk-bar').classList.toggle('show',n>0);
+  document.getElementById('bulk-count').textContent=n+' selecionado'+(n!==1?'s':'');
+}
+function toggleSelect(id,item,cb){
+  if(selected.has(id)){selected.delete(id);item.classList.remove('selected');cb.classList.remove('checked');cb.textContent='';}
+  else{selected.add(id);item.classList.add('selected');cb.classList.add('checked');cb.textContent='✓';}
+  updateBulkBar();
+}
+function clearSelection(){selected.clear();updateBulkBar();if(activeFilter!==null)renderList(activeFilter);}
+function bulkDelete(){
+  if(!selected.size||!confirm('Excluir '+selected.size+' story(s)?'))return;
+  S=S.filter(s=>!selected.has(s.id));sv();clearSelection();renderList(activeFilter);showToast('Stories excluídos','success');
+}
+function bulkReschedule(){
+  if(!selected.size)return;
+  const newDate=prompt('Nova data (YYYY-MM-DD):',ds(new Date()));
+  if(!newDate)return;
+  const newTime=prompt('Novo horário (HH:MM):','09:00');
+  if(!newTime)return;
+  S.forEach(s=>{if(selected.has(s.id)){s.date=newDate;s.time=newTime;s.status='scheduled';}});
+  sv();clearSelection();renderList(activeFilter);showToast(selected.size+' stories reagendados','success');
+}
 function renderList(filter){
   const c=document.getElementById('main-content');c.innerHTML='';
   const wrap=document.createElement('div');wrap.className='list-wrap';
   const filtered=filter?S.filter(s=>s.status===filter||(filter==='scheduled'&&s.status==='pending')):[...S].sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
   if(!filtered.length){wrap.innerHTML='<div class="empty-state"><div class="empty-icon">&#128219;</div><div class="empty-text">Nenhum story encontrado</div></div>';c.appendChild(wrap);return;}
+  // Select all row
+  const selRow=document.createElement('div');selRow.className='select-all-row';
+  const selCb=document.createElement('div');selCb.className='list-cb '+(selected.size===filtered.length&&filtered.length>0?'checked':'');
+  selCb.textContent=selected.size===filtered.length&&filtered.length>0?'✓':'';
+  const selLabel=document.createElement('span');selLabel.className='select-all-label';selLabel.textContent='Selecionar todos ('+filtered.length+')';
+  selRow.onclick=()=>{
+    if(selected.size===filtered.length){filtered.forEach(s=>selected.delete(s.id));}
+    else{filtered.forEach(s=>selected.add(s.id));}
+    updateBulkBar();renderList(filter);
+  };
+  selRow.appendChild(selCb);selRow.appendChild(selLabel);wrap.appendChild(selRow);
   const grouped={};filtered.forEach(s=>{if(!grouped[s.date])grouped[s.date]=[];grouped[s.date].push(s);});
   Object.keys(grouped).sort().forEach(date=>{
     const sec=document.createElement('div');sec.className='list-section';
@@ -541,7 +598,9 @@ function renderList(filter){
     title.textContent=dd.getDate()+' de '+MO[dd.getMonth()]+' '+dd.getFullYear();
     sec.appendChild(title);
     grouped[date].forEach(s=>{
-      const item=document.createElement('div');item.className='list-item';
+      const item=document.createElement('div');item.className='list-item'+(selected.has(s.id)?' selected':'');
+      const cb=document.createElement('div');cb.className='list-cb'+(selected.has(s.id)?' checked':'');cb.textContent=selected.has(s.id)?'✓':'';
+      cb.onclick=e=>{e.stopPropagation();toggleSelect(s.id,item,cb);};
       const thumb=document.createElement('div');thumb.className='list-thumb';
       if(s.url&&s.url.startsWith('http')&&s.mediaType!=='VIDEO'){const img=document.createElement('img');img.src=s.url;img.onerror=()=>{thumb.textContent='🖼';};thumb.appendChild(img);}
       else thumb.textContent=s.mediaType==='VIDEO'?'🎥':'🖼';
@@ -550,10 +609,11 @@ function renderList(filter){
       const st=document.createElement('div');st.className='list-status '+s.status;
       st.textContent={scheduled:'AGENDADO',published:'PUBLICADO',error:'FALHOU',pending:'PENDENTE'}[s.status]||s.status.toUpperCase();
       const acts=document.createElement('div');acts.className='list-actions';
-      const editBtn=document.createElement('button');editBtn.className='list-btn';editBtn.textContent='Editar';editBtn.onclick=()=>openEdit(s);
-      const delBtn=document.createElement('button');delBtn.className='list-btn del';delBtn.textContent='x';delBtn.onclick=()=>{if(confirm('Excluir?')){S=S.filter(x=>x.id!==s.id);sv();renderList(filter);}};
+      const editBtn=document.createElement('button');editBtn.className='list-btn';editBtn.textContent='Editar';editBtn.onclick=e=>{e.stopPropagation();openEdit(s);};
+      const delBtn=document.createElement('button');delBtn.className='list-btn del';delBtn.textContent='✕';delBtn.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){S=S.filter(x=>x.id!==s.id);sv();renderList(filter);}};
       acts.appendChild(editBtn);acts.appendChild(delBtn);
-      item.appendChild(thumb);item.appendChild(info);item.appendChild(st);item.appendChild(acts);
+      item.appendChild(cb);item.appendChild(thumb);item.appendChild(info);item.appendChild(st);item.appendChild(acts);
+      item.onclick=()=>openEdit(s);
       sec.appendChild(item);
     });
     wrap.appendChild(sec);
