@@ -328,8 +328,23 @@ function updatePublishPreview(){
   const isVideo=url.toLowerCase().includes('.mp4')||url.toLowerCase().includes('video');
   setFrameMedia(document.getElementById('pnow-frame-img'),document.getElementById('pnow-frame-video'),document.getElementById('pnow-frame-empty'),url&&url.startsWith('http')?url:null,isVideo);
 }
-function handleFileSelect(e){
+async function handleFileSelect(e){
   const f=e.target.files[0];if(!f)return;selectedFile=f;
+  // Upload imediato para Cloudinary
+  showToast('Fazendo upload...');
+  const fd=new FormData();fd.append('file',f);fd.append('ig_id',IG_ID);
+  try{
+    const r=await fetch(API_URL+'/upload',{method:'POST',body:fd});
+    const d=await r.json();
+    if(d.url){
+      document.getElementById('input-url').value=d.url;
+      switchMediaTab('url');
+      updatePreview();
+      showToast('Upload concluido! URL gerada.');
+      selectedFile=null;
+      return;
+    }
+  }catch(e2){showToast('Erro no upload',true);}
   document.getElementById('upload-content').style.display='none';
   const badge=document.getElementById('upload-badge');badge.style.display='block';badge.textContent=f.type.includes('video')?'VIDEO':'IMG';
   document.getElementById('upload-area').classList.add('has-file');
