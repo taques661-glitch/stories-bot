@@ -438,11 +438,21 @@ function openEdit(s){
 function closeModal(){document.getElementById('modal').style.display='none';editingStory=null;selectedFile=null;}
 function updateRepeatPreview(){const r=document.getElementById('input-repeat').value,p=document.getElementById('repeat-preview');const msgs={daily:'7 dias seguidos',weekly:'4 semanas',weekdays:'5 dias uteis',monthly:'3 meses'};p.textContent=msgs[r]||'';p.style.display=r!=='none'?'block':'none';}
 function addDays(d,n){const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return ds(x);}
-function saveStory(){
+async function saveStory(){
   const date=document.getElementById('input-date').value,time=document.getElementById('input-time').value,caption=document.getElementById('input-caption').value,repeat=document.getElementById('input-repeat').value,url=document.getElementById('input-url').value;
   if(!date||!time){showToast('Preencha data e horario!',true);return;}
-  const mt=selectedFile?(selectedFile.type.includes('video')?'VIDEO':'IMAGE'):(url.toLowerCase().includes('.mp4')?'VIDEO':'IMAGE');
-  const fu=selectedFile?'[arquivo:'+selectedFile.name+']':url;
+  let mt=selectedFile?(selectedFile.type.includes('video')?'VIDEO':'IMAGE'):(url.toLowerCase().includes('.mp4')?'VIDEO':'IMAGE');
+  let fu=url;
+  if(selectedFile){
+    showToast('Fazendo upload...');
+    const fd=new FormData();fd.append('file',selectedFile);fd.append('ig_id',IG_ID);
+    try{
+      const r=await fetch(API_URL+'/upload',{method:'POST',body:fd});
+      const d=await r.json();
+      if(d.url){fu=d.url;mt=d.mediaType||mt;showToast('Upload concluido!');}
+      else{showToast('Erro no upload',true);return;}
+    }catch(e){showToast('Erro no upload',true);return;}
+  }
   if(editingStory){const i=stories.findIndex(s=>s.id===editingStory.id);if(i>=0)stories[i]={...stories[i],url:fu,date,time,caption,repeat,mediaType:mt};showToast('Story atualizado');}
   else{
     const base={id:Date.now(),url:fu,date,time,caption,repeat,status:'scheduled',mediaType:mt};stories.push(base);
