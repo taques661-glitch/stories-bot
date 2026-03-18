@@ -255,20 +255,28 @@ app.post("/stories/publish", upload.single("file"), async (req, res) => {
     const containerId = containerRes.data.id;
     console.log(`Container criado: ${containerId}`);
 
-    // FIX: polling estendido para vídeo (5 min)
     if (isVideo) {
-      await waitForVideo(containerId, token);
+      // Responde imediatamente — publica em background para evitar timeout do Render
+      res.json({ success: true, processing: true });
+      try {
+        await waitForVideo(containerId, token);
+        await axios.post(
+          `https://graph.facebook.com/v19.0/${igId}/media_publish`,
+          { creation_id: containerId, access_token: token }
+        );
+        console.log(`Vídeo publicado com sucesso em background!`);
+      } catch (bgErr) {
+        console.error(`Erro ao publicar vídeo em background:`, bgErr.response?.data || bgErr.message);
+      }
     } else {
       await sleep(3000);
+      await axios.post(
+        `https://graph.facebook.com/v19.0/${igId}/media_publish`,
+        { creation_id: containerId, access_token: token }
+      );
+      console.log(`Imagem publicada com sucesso!`);
+      res.json({ success: true });
     }
-
-    await axios.post(
-      `https://graph.facebook.com/v19.0/${igId}/media_publish`,
-      { creation_id: containerId, access_token: token }
-    );
-
-    console.log(`Publicado com sucesso!`);
-    res.json({ success: true });
   } catch (e) {
     const errMsg = e.response?.data?.error?.message || e.message;
     console.error("Publish error:", errMsg, e.response?.data || '');
