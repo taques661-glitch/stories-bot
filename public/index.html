@@ -1075,8 +1075,7 @@ async function publishNow(){
   btn.disabled=true;btn.textContent='Publicando...';prog.style.display='block';fill.style.width='20%';
   try{
     let r;
-    if(pubFile){const fd=new FormData();fd.append('file',pubFile);fd.append('ig_id',IG_ID);fill.style.width='40%';r=await fetch(API+'/stories/publish',{method:'POST',body:fd});}
-    else{const url=document.getElementById('pnow-url').value;if(!url){showToast('Selecione uma midia!',true);btn.disabled=false;btn.textContent='Publicar Agora';prog.style.display='none';return;}fill.style.width='40%';r=await fetch(API+'/stories/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ig_id:IG_ID,media_url:url,media_type:url.toLowerCase().includes('.mp4')?'VIDEO':'IMAGE'})});}
+    const url=document.getElementById('pnow-url').value;if(!url){showToast('Selecione uma midia e aguarde o upload!',true);btn.disabled=false;btn.textContent='Publicar Agora';prog.style.display='none';return;}fill.style.width='40%';const isVidNow=url.toLowerCase().includes('.mp4')||url.toLowerCase().includes('.mov');r=await fetch(API+'/stories/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ig_id:IG_ID,media_url:url,media_type:isVidNow?'VIDEO':'IMAGE'})});
     fill.style.width='80%';const data=await r.json();
     if(data.success){
       fill.style.width='100%';
