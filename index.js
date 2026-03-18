@@ -103,6 +103,14 @@ cron.schedule('* * * * *', async () => {
       console.log('Publicado agendado:', story.id);
     }catch(err){story.status='error';console.error('Erro agendado:', err.message);}
   }
+  const pending = scheduled.filter(s => s.status==='pending' && s.date===dateStr && s.time===timeStr);
+  for(const story of pending){
+    try{
+      await publishStory(story.ig_id||IG_ID, story.url, story.mediaType||'IMAGE', IG_TOKEN);
+      story.status='published';
+      console.log('Publicado agendado:', story.id);
+    }catch(err){story.status='error';console.error('Erro agendado:', err.message);}
+  }
 });
 app.listen(PORT, "0.0.0.0", () => console.log("Stories Bot porta " + PORT));
 
