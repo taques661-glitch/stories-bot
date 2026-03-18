@@ -162,25 +162,51 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file" });
     const isVideo = req.file.mimetype.startsWith("video");
+    const sizeMB = (req.file.size / 1024 / 1024).toFixed(1);
+    console.log(`Upload recebido: ${sizeMB}MB [${isVideo ? 'VIDEO' : 'IMAGE'}]`);
+
+    // Para vídeo: sobe sem transformação síncrona, usa eager_async para compressão em background
+    const uploadOptions = isVideo ? {
+      resource_type: "video",
+      folder: "stories_tfx",
+      format: "mp4",
+      eager: [{ fetch_format: "mp4", quality: "auto:good", bit_rate: "2m", width: 1080, height: 1920, crop: "limit" }],
+      eager_async: true  // processa em background — não trava o upload
+    } : {
+      resource_type: "image",
+      folder: "stories_tfx"
+    };
+
     const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          resource_type: isVideo ? "video" : "image",
-          folder: "stories_tfx",
-          // FIX: converte MOV/outros para MP4 (Instagram só aceita MP4)
-          ...(isVideo ? { format: "mp4", transformation: [{ fetch_format: "mp4", quality: "auto:good", bit_rate: "2m", width: 1080, height: 1920, crop: "limit" }] } : {}),
-          // FIX: garante que o Cloudinary não aplique transformações automáticas
-          eager_async: false
-        },
+      const stream = cloudinary.uploader.upload_stream(uploadOptions,
         (err, result) => err ? reject(err) : resolve(result)
       );
       stream.end(req.file.buffer);
     });
-    // FIX: usa secure_url limpa
-    const cleanUrl = cleanCloudinaryUrl(result.secure_url);
-    const sizeMB = (req.file.size / 1024 / 1024).toFixed(1);
-    console.log(`Upload OK: ${cleanUrl} [${isVideo ? 'VIDEO' : 'IMAGE'}] ${sizeMB}MB original`);
-    res.json({ url: cleanUrl, mediaType: isVideo ? "VIDEO" : "IMAGE" });
+
+    let finalUrl;
+    if (isVideo) {
+      // Polling: aguarda o eager terminar (URL comprimida fica em result.eager[0])
+      console.log(`Aguardando Cloudinary processar vídeo... public_id: ${result.public_id}`);
+      let eagerUrl = null;
+      for (let i = 0; i < 24; i++) {  // até 2 minutos (24 x 5s)
+        await sleep(5000);
+        const check = await cloudinary.api.resource(result.public_id, { resource_type: "video", eager: true });
+        if (check.eager && check.eager[0] && check.eager[0].secure_url) {
+          eagerUrl = check.eager[0].secure_url;
+          console.log(`Vídeo processado em ${(i+1)*5}s: ${eagerUrl}`);
+          break;
+        }
+        console.log(`Aguardando... tentativa ${i+1}/24`);
+      }
+      // Se eager não ficou pronto, usa a URL original (já é mp4 pelo format:"mp4")
+      finalUrl = eagerUrl || cleanCloudinaryUrl(result.secure_url);
+    } else {
+      finalUrl = cleanCloudinaryUrl(result.secure_url);
+    }
+
+    console.log(`Upload OK: ${finalUrl} [${isVideo ? 'VIDEO' : 'IMAGE'}] ${sizeMB}MB original`);
+    res.json({ url: finalUrl, mediaType: isVideo ? "VIDEO" : "IMAGE" });
   } catch (e) {
     console.error("Upload error:", e.message);
     res.status(500).json({ error: e.message });
