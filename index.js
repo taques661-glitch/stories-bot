@@ -52,6 +52,27 @@ async function publishStory(ig_id, mediaUrl, mediaType, token) {
   return { media_id: p.data.id };
 }
 
+
+app.post('/upload', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo' });
+  try {
+    const mediaType = req.file.mimetype.includes('video') ? 'VIDEO' : 'IMAGE';
+    const resourceType = mediaType === 'VIDEO' ? 'video' : 'image';
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { resource_type: resourceType, folder: 'stories-bot' },
+        (error, result) => error ? reject(error) : resolve(result)
+      );
+      stream.end(req.file.buffer);
+    });
+    console.log('Upload OK:', result.secure_url);
+    res.json({ success: true, url: result.secure_url, mediaType });
+  } catch(err) {
+    console.error('Erro upload:', err.message);
+    res.status(500).json({ error: 'Erro no upload' });
+  }
+});
+
 app.post("/stories/publish", upload.single("file"), async (req, res) => {
   const ig_id = req.body.ig_id || IG_ID;
   const token = IG_TOKEN;
