@@ -95,8 +95,8 @@ cron.schedule('* * * * *', async () => {
   const dateStr = manaus.getFullYear()+'-'+pad(manaus.getMonth()+1)+'-'+pad(manaus.getDate());
   const timeStr = pad(manaus.getHours())+':'+pad(manaus.getMinutes());
   console.log('Cron:', dateStr, timeStr, 'pending:', scheduled.filter(s=>s.status==='pending').length);
-  const pending = scheduled.filter(s => s.status==='pending' && s.date===dateStr && s.time===timeStr);
-  for(const story of pending){
+  const toPublish = scheduled.filter(s => s.status==='pending' && s.date===dateStr && s.time===timeStr);
+  for(const story of toPublish){
     try{
       await publishStory(story.ig_id||IG_ID, story.url, story.mediaType||'IMAGE', IG_TOKEN);
       story.status='published';
