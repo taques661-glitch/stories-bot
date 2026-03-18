@@ -61,6 +61,31 @@ async function sbDelete(id) {
   await axios.delete(`${SUPABASE_URL}/rest/v1/stories_tfx?id=eq.${id}`, { headers: sbHeaders });
 }
 
+// FIX: garante URL limpa do Cloudinary (sem transformações que o Instagram rejeita)
+function cleanCloudinaryUrl(url) {
+  if (!url || !url.includes('cloudinary.com')) return url;
+  // Remove qualquer segmento de transformação entre /upload/ e o nome do arquivo
+  return url.replace(/\/upload\/[^/]+\/v/, '/upload/v');
+}
+
+// FIX: polling mais robusto para vídeo — 60 tentativas × 5s = 5 minutos
+async function waitForVideo(containerId, token) {
+  for (let i = 0; i < 60; i++) {
+    await sleep(5000);
+    const statusRes = await axios.get(
+      `https://graph.facebook.com/v19.0/${containerId}?fields=status_code,status&access_token=${token}`
+    );
+    const code = statusRes.data.status_code;
+    console.log(`[Vídeo] tentativa ${i+1}/60 — status: ${code}`);
+    if (code === 'FINISHED') return true;
+    if (code === 'ERROR') {
+      const detail = statusRes.data.status || 'sem detalhes';
+      throw new Error(`Instagram rejeitou o vídeo: ${detail}`);
+    }
+  }
+  throw new Error('Timeout: vídeo não processou em 5 minutos');
+}
+
 app.get("/api", (req, res) => res.json({ status: "ok" }));
 app.get("/health", (req, res) => res.sendStatus(200));
 app.get("/accounts", (req, res) => {
@@ -139,12 +164,20 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     const isVideo = req.file.mimetype.startsWith("video");
     const result = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { resource_type: isVideo ? "video" : "image", folder: "stories_tfx" },
+        {
+          resource_type: isVideo ? "video" : "image",
+          folder: "stories_tfx",
+          // FIX: garante que o Cloudinary não aplique transformações automáticas
+          eager_async: false
+        },
         (err, result) => err ? reject(err) : resolve(result)
       );
       stream.end(req.file.buffer);
     });
-    res.json({ url: result.secure_url, mediaType: isVideo ? "VIDEO" : "IMAGE" });
+    // FIX: usa secure_url limpa
+    const cleanUrl = cleanCloudinaryUrl(result.secure_url);
+    console.log(`Upload OK: ${cleanUrl} [${isVideo ? 'VIDEO' : 'IMAGE'}]`);
+    res.json({ url: cleanUrl, mediaType: isVideo ? "VIDEO" : "IMAGE" });
   } catch (e) {
     console.error("Upload error:", e.message);
     res.status(500).json({ error: e.message });
@@ -168,13 +201,18 @@ app.post("/stories/publish", upload.single("file"), async (req, res) => {
         );
         stream.end(req.file.buffer);
       });
-      mediaUrl = result.secure_url;
+      mediaUrl = cleanCloudinaryUrl(result.secure_url);
       mediaType = isVideo ? "VIDEO" : "IMAGE";
     }
 
     if (!mediaUrl) return res.status(400).json({ error: "No media URL" });
 
+    // FIX: limpa URL antes de enviar ao Instagram
+    mediaUrl = cleanCloudinaryUrl(mediaUrl);
+
     const isVideo = mediaType === "VIDEO";
+    console.log(`Publicando ${isVideo ? 'VÍDEO' : 'IMAGEM'}: ${mediaUrl}`);
+
     const containerRes = await axios.post(
       `https://graph.facebook.com/v19.0/${igId}/media`,
       {
@@ -184,21 +222,11 @@ app.post("/stories/publish", upload.single("file"), async (req, res) => {
       }
     );
     const containerId = containerRes.data.id;
+    console.log(`Container criado: ${containerId}`);
 
-    // Poll until ready
+    // FIX: polling estendido para vídeo (5 min)
     if (isVideo) {
-      let ready = false;
-      for (let i = 0; i < 20; i++) {
-        await sleep(5000);
-        const statusRes = await axios.get(
-          `https://graph.facebook.com/v19.0/${containerId}?fields=status_code&access_token=${token}`
-        );
-        const status = statusRes.data.status_code;
-        console.log(`Video status [${i+1}]: ${status}`);
-        if (status === 'FINISHED') { ready = true; break; }
-        if (status === 'ERROR') throw new Error('Video processing failed');
-      }
-      if (!ready) throw new Error('Video processing timeout');
+      await waitForVideo(containerId, token);
     } else {
       await sleep(3000);
     }
@@ -207,55 +235,62 @@ app.post("/stories/publish", upload.single("file"), async (req, res) => {
       `https://graph.facebook.com/v19.0/${igId}/media_publish`,
       { creation_id: containerId, access_token: token }
     );
+
+    console.log(`Publicado com sucesso!`);
     res.json({ success: true });
   } catch (e) {
-    console.error("Publish error:", e.response?.data || e.message);
-    res.status(500).json({ error: e.response?.data?.error?.message || e.message });
+    const errMsg = e.response?.data?.error?.message || e.message;
+    console.error("Publish error:", errMsg, e.response?.data || '');
+    res.status(500).json({ error: errMsg });
   }
 });
 
-// CRON - publish scheduled stories
+// CRON - publish scheduled stories (servidor)
 setInterval(async () => {
   try {
     const now = new Date();
     const dateStr = now.toISOString().split("T")[0];
     const timeStr = now.toTimeString().substring(0, 5);
     const rows = await sbGet(`status=eq.scheduled&date=eq.${dateStr}&time=eq.${timeStr}`);
+
     for (const row of rows) {
       if (!row.url || row.url.includes("[arquivo")) continue;
+
+      // FIX: marca como 'publishing' para evitar dupla publicação pelo frontend
+      await sbUpdate(row.id, { status: "publishing" });
+
       try {
         const isVideo = row.media_type === "VIDEO";
+        const mediaUrl = cleanCloudinaryUrl(row.url);
+
+        console.log(`[Cron] Publicando story ${row.id} — ${isVideo ? 'VÍDEO' : 'IMAGEM'}`);
+
         const containerRes = await axios.post(
           `https://graph.facebook.com/v19.0/${row.ig_id || IG_ID}/media`,
           {
-            [isVideo ? "video_url" : "image_url"]: row.url,
+            [isVideo ? "video_url" : "image_url"]: mediaUrl,
             media_type: "STORIES",
             access_token: IG_TOKEN
           }
         );
         const containerId = containerRes.data.id;
+
         if (isVideo) {
-          let ready = false;
-          for (let i = 0; i < 20; i++) {
-            await sleep(5000);
-            const statusRes = await axios.get(
-              `https://graph.facebook.com/v19.0/${containerId}?fields=status_code&access_token=${IG_TOKEN}`
-            );
-            if (statusRes.data.status_code === 'FINISHED') { ready = true; break; }
-            if (statusRes.data.status_code === 'ERROR') throw new Error('Video processing failed');
-          }
-          if (!ready) throw new Error('Video processing timeout');
+          await waitForVideo(containerId, IG_TOKEN);
         } else {
           await sleep(3000);
         }
+
         await axios.post(
           `https://graph.facebook.com/v19.0/${row.ig_id || IG_ID}/media_publish`,
           { creation_id: containerId, access_token: IG_TOKEN }
         );
+
         await sbUpdate(row.id, { status: "published" });
-        console.log(`Published story ${row.id}`);
+        console.log(`[Cron] Story ${row.id} publicado!`);
       } catch (e) {
-        console.error(`Failed story ${row.id}:`, e.response?.data || e.message);
+        const errMsg = e.response?.data?.error?.message || e.message;
+        console.error(`[Cron] Falha story ${row.id}:`, errMsg);
         await sbUpdate(row.id, { status: "error" });
       }
     }

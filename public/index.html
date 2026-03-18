@@ -70,7 +70,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .pill-btn{width:14px;height:14px;border-radius:2px;border:none;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
 .pill-btn.edit{background:rgba(255,255,255,0.15);color:inherit}
 .pill-btn.del{background:rgba(248,113,113,0.3);color:#f87171}
-.story-pill.scheduled,.story-pill.pending{background:var(--gold-dim);color:var(--gold);border-color:var(--gold)}
+.story-pill.scheduled,.story-pill.pending,.story-pill.publishing{background:var(--gold-dim);color:var(--gold);border-color:var(--gold)}
 .story-pill.published{background:var(--green-dim);color:var(--green);border-color:var(--green)}
 .story-pill.error{background:var(--red-dim);color:var(--red);border-color:var(--red)}
 .day-actions{position:absolute;top:4px;right:4px;display:flex;gap:2px}
@@ -739,7 +739,7 @@ function renderList(filter){
       const info=document.createElement('div');info.className='list-info';
       info.innerHTML='<div class="list-caption">'+(s.caption||'Sem legenda')+'</div><div class="list-meta">'+s.time+(s.link?' · Link':'')+' · '+s.mediaType+'</div>';
       const st=document.createElement('div');st.className='list-status '+s.status;
-      st.textContent={scheduled:'AGENDADO',published:'PUBLICADO',error:'FALHOU',pending:'PENDENTE'}[s.status]||s.status.toUpperCase();
+      st.textContent={scheduled:'AGENDADO',publishing:'PUBLICANDO...',published:'PUBLICADO',error:'FALHOU',pending:'PENDENTE'}[s.status]||s.status.toUpperCase();
       const acts=document.createElement('div');acts.className='list-actions';
       const editBtn=document.createElement('button');editBtn.className='list-btn';editBtn.textContent='Editar';editBtn.onclick=e=>{e.stopPropagation();openEdit(s);};
       const delBtn=document.createElement('button');delBtn.className='list-btn del';delBtn.textContent='✕';delBtn.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();renderList(filter);}};
@@ -1009,7 +1009,7 @@ async function publishNow(){
       S.push({id:Date.now(),url:pubFile?'[arquivo]':document.getElementById('pnow-url').value,date:ds(new Date()),time:new Date().toTimeString().substring(0,5),caption:'Publicado agora',status:'published',repeat:'none',mediaType:pubFile?(pubFile.type.includes('video')?'VIDEO':'IMAGE'):'IMAGE',link:''});
       sv();if(activeFilter!==null)renderList(activeFilter);else render();
       document.getElementById('modal-publish').style.display='none';
-      showToast('Story publicado!','success');    }else showToast('Erro: '+(data.error||'Falha'),true);
+      showToast('Story publicado!','success');    }else showToast('Erro: '+(data.error||'Falha ao publicar — verifique o console'),true);
   }catch(e){showToast('Erro de conexao',true);}
   btn.disabled=false;btn.textContent='Publicar Agora';
   setTimeout(()=>{prog.style.display='none';fill.style.width='0%';},2000);
@@ -1019,18 +1019,10 @@ function showToast(msg,type){
   t.className='toast'+(type==='success'?' success':type===true?' error':'');
   t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3500);
 }
-setInterval(()=>{
-  const n=new Date(),dstr=ds(n),tstr=n.toTimeString().substring(0,5);
-  S.forEach(s=>{
-    if(s.status==='scheduled'&&s.date===dstr&&s.time===tstr&&s.url&&!s.url.includes('[arquivo')){
-      fetch(API+'/stories/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ig_id:IG_ID,media_url:s.url,media_type:s.mediaType||'IMAGE'})})
-        .then(r=>r.json()).then(d=>{
-          if(d.success){s.status='published';sbPatch(s.id,{status:'published'});sv();if(activeFilter!==null)renderList(activeFilter);else render();showToast('Story de '+s.time+' publicado!','success');}
-          else{s.status='error';sbPatch(s.id,{status:'error'});sv();}
-        }).catch(()=>{});
-    }
-  });
-},60000);
+// Cron de publicação removido do frontend — o servidor cuida disso
+// Evita conflito (dupla publicação) especialmente em vídeos que demoram para processar
+// Sincroniza status a cada 2 min para refletir o que o servidor publicou
+setInterval(loadStories, 120000);
 render();stats();loadStories();
 </script>
 </body>
