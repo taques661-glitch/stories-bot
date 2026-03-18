@@ -1065,10 +1065,8 @@ function showToast(msg,type){
   t.className='toast'+(type==='success'?' success':type===true?' error':'');
   t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3500);
 }
-// Cron de publicação removido do frontend — o servidor cuida disso
-// Evita conflito (dupla publicação) especialmente em vídeos que demoram para processar
-// Sincroniza status a cada 2 min para refletir o que o servidor publicou
-setInterval(loadStories, 120000);
+// Sincroniza status a cada 30s para refletir publicados/falhos do servidor
+setInterval(loadStories, 30000);
 render();stats();loadStories();
 </script>
 </body>
