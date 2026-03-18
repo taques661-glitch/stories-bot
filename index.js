@@ -16,7 +16,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET || "UfSIUfCFYttXlmw0xTLh3ts50Xs"
 });
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const IG_TOKEN = process.env.IG_TOKEN;
 const IG_ID = process.env.IG_ID;
@@ -178,7 +178,8 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     });
     // FIX: usa secure_url limpa
     const cleanUrl = cleanCloudinaryUrl(result.secure_url);
-    console.log(`Upload OK: ${cleanUrl} [${isVideo ? 'VIDEO' : 'IMAGE'}]`);
+    const sizeMB = (req.file.size / 1024 / 1024).toFixed(1);
+    console.log(`Upload OK: ${cleanUrl} [${isVideo ? 'VIDEO' : 'IMAGE'}] ${sizeMB}MB original`);
     res.json({ url: cleanUrl, mediaType: isVideo ? "VIDEO" : "IMAGE" });
   } catch (e) {
     console.error("Upload error:", e.message);
