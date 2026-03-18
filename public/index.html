@@ -853,9 +853,22 @@ async function saveStory(){
   let fu=url;
   if(selFile){
     showToast('Fazendo upload...');
-    const fd=new FormData();fd.append('file',selFile);fd.append('ig_id',IG_ID);
-    try{const r=await fetch(API+'/upload',{method:'POST',body:fd});const d=await r.json();if(d.url){fu=d.url;mt=d.mediaType||mt;}else{showToast('Erro no upload',true);return;}}
-    catch(e){showToast('Erro no upload',true);return;}
+    try{
+    const isVid2=f.type.includes('video');
+    const fd=new FormData();
+    fd.append('file',f);
+    fd.append('upload_preset','stories_tfx_unsigned');
+    fd.append('folder','stories_tfx');
+    const cloudName='dbwdldowa';
+    const resourceType=isVid2?'video':'image';
+    const r=await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,{method:'POST',body:fd});
+    const d=await r.json();
+    if(d.error) throw new Error(d.error.message);
+    let fu=d.secure_url;
+    if(isVid2) fu=fu.replace(/\.[^.]+$/, '.mp4');
+    const mt=isVid2?'VIDEO':'IMAGE';
+    fu=fu;
+    }catch(e){showToast('Erro no upload: '+e.message,true);return;}
   }
   if(editing){
     const i=S.findIndex(s=>s.id===editing.id);
@@ -1017,11 +1030,20 @@ async function saveBulkStories(){
     let mediaUrl=bf.url,mediaType=bf.type&&bf.type.includes('video')?'VIDEO':'IMAGE';
     if(!mediaUrl){
       try{
-        const fd=new FormData();fd.append('file',bf.file);fd.append('ig_id',IG_ID);
-        const r=await fetch(API+'/upload',{method:'POST',body:fd});
+        const f=bf.file;
+        const isVid2=f.type.includes('video');
+        const fd=new FormData();
+        fd.append('file',f);
+        fd.append('upload_preset','stories_tfx_unsigned');
+        fd.append('folder','stories_tfx');
+        const cloudName='dbwdldowa';
+        const resourceType=isVid2?'video':'image';
+        const r=await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,{method:'POST',body:fd});
         const d=await r.json();
-        if(d.url){mediaUrl=d.url;mediaType=d.mediaType||mediaType;}
-        else throw new Error('fail');
+        if(d.error) throw new Error(d.error.message);
+        mediaUrl=d.secure_url;
+        if(isVid2) mediaUrl=mediaUrl.replace(/\.[^.]+$/, '.mp4');
+        mediaType=isVid2?'VIDEO':'IMAGE';
       }catch(e){stepEls[i].className='progress-step fail';fail++;continue;}
     }
     const story={id:Date.now()+i*7,url:mediaUrl,date:bf.assignedDay||ds(new Date()),time:bf.time||'09:00',caption,repeat:'none',status:'scheduled',mediaType,link:'',ig_id:IG_ID};
