@@ -559,37 +559,39 @@ async function handleFileSelect(e){
   else{document.getElementById('upload-prev-img').src=url;document.getElementById('upload-prev-img').style.display='block';}
   setPhone(document.getElementById('pv-img'),document.getElementById('pv-video'),document.getElementById('pv-empty'),url,isVid);
   showToast('Fazendo upload...');
-  const fd=new FormData();fd.append('file',f);fd.append('ig_id',IG_ID);
   try{
-    const r=await fetch(API+'/upload',{method:'POST',body:fd});const d=await r.json();
-    if(d.url){
-      const uploadedUrl=d.url;
-      const uploadedIsVideo=d.mediaType==='VIDEO';
-      document.getElementById('input-url').value=uploadedUrl;
-      // Troca para aba URL mantendo o preview correto
-      ['url','upload'].forEach(x=>{
-        document.getElementById('tab-'+x).classList.toggle('active',x==='url');
-        document.getElementById('section-'+x).style.display=x==='url'?'block':'none';
-      });
-      // Força preview com o tipo correto (não depende da extensão da URL)
-      setPhone(
-        document.getElementById('pv-img'),
-        document.getElementById('pv-video'),
-        document.getElementById('pv-empty'),
-        uploadedUrl,
-        uploadedIsVideo
-      );
-      // Garante que o elemento video carregue
-      if(uploadedIsVideo){
-        const pv=document.getElementById('pv-video');
-        pv.src=uploadedUrl;
-        pv.load();
-      }
-      selFile=null;
-      showToast('Upload concluido!','success');
+    const isVid2=f.type.includes('video');
+    const fd=new FormData();
+    fd.append('file',f);
+    fd.append('upload_preset','stories_tfx_unsigned');
+    fd.append('folder','stories_tfx');
+    const cloudName='dbwdldowa';
+    const resourceType=isVid2?'video':'image';
+    const r=await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,{method:'POST',body:fd});
+    const d=await r.json();
+    if(d.error){showToast('Erro: '+d.error.message,true);return;}
+    let uploadedUrl=d.secure_url;
+    const uploadedIsVideo=isVid2;
+    document.getElementById('input-url').value=uploadedUrl;
+    ['url','upload'].forEach(x=>{
+      document.getElementById('tab-'+x).classList.toggle('active',x==='url');
+      document.getElementById('section-'+x).style.display=x==='url'?'block':'none';
+    });
+    setPhone(
+      document.getElementById('pv-img'),
+      document.getElementById('pv-video'),
+      document.getElementById('pv-empty'),
+      uploadedUrl,
+      uploadedIsVideo
+    );
+    if(uploadedIsVideo){
+      const pv=document.getElementById('pv-video');
+      pv.src=uploadedUrl;
+      pv.load();
     }
-    else showToast('Erro no upload',true);
-  }catch(e2){showToast('Erro no upload',true);}
+    selFile=null;
+    showToast('Upload concluido!','success');
+  }catch(e2){showToast('Erro no upload: '+e2.message,true);}
 }
 async function handlePublishFileSelect(e){
   const f=e.target.files[0];if(!f)return;pubFile=f;
