@@ -306,9 +306,15 @@ setInterval(async () => {
 
       try {
         const isVideo = row.media_type === "VIDEO";
-        const mediaUrl = cleanCloudinaryUrl(row.url);
+        // Garante URL MP4 para vídeos do Cloudinary
+        let mediaUrl = cleanCloudinaryUrl(row.url);
+        if(isVideo && mediaUrl.includes('cloudinary.com') && !mediaUrl.endsWith('.mp4')){
+          // Força transformação para MP4 na URL
+          mediaUrl = mediaUrl.replace('/upload/', '/upload/c_limit,w_1080,h_1920,q_auto:good,br_2m/').replace(/\.mov$/, '.mp4').replace(/\.MOV$/, '.mp4');
+          if(!mediaUrl.endsWith('.mp4')) mediaUrl = mediaUrl + '.mp4';
+        }
 
-        console.log(`[Cron] Publicando story ${row.id} — ${isVideo ? 'VÍDEO' : 'IMAGEM'}`);
+        console.log(`[Cron] Publicando story ${row.id} — ${isVideo ? 'VÍDEO' : 'IMAGEM'}: ${mediaUrl}`);
 
         const containerRes = await axios.post(
           `https://graph.facebook.com/v19.0/${row.ig_id || IG_ID}/media`,
