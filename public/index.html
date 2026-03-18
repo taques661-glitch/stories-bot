@@ -562,7 +562,32 @@ async function handleFileSelect(e){
   const fd=new FormData();fd.append('file',f);fd.append('ig_id',IG_ID);
   try{
     const r=await fetch(API+'/upload',{method:'POST',body:fd});const d=await r.json();
-    if(d.url){document.getElementById('input-url').value=d.url;switchMediaTab('url');updatePreview();selFile=null;showToast('Upload concluido!','success');}
+    if(d.url){
+      const uploadedUrl=d.url;
+      const uploadedIsVideo=d.mediaType==='VIDEO';
+      document.getElementById('input-url').value=uploadedUrl;
+      // Troca para aba URL mantendo o preview correto
+      ['url','upload'].forEach(x=>{
+        document.getElementById('tab-'+x).classList.toggle('active',x==='url');
+        document.getElementById('section-'+x).style.display=x==='url'?'block':'none';
+      });
+      // Força preview com o tipo correto (não depende da extensão da URL)
+      setPhone(
+        document.getElementById('pv-img'),
+        document.getElementById('pv-video'),
+        document.getElementById('pv-empty'),
+        uploadedUrl,
+        uploadedIsVideo
+      );
+      // Garante que o elemento video carregue
+      if(uploadedIsVideo){
+        const pv=document.getElementById('pv-video');
+        pv.src=uploadedUrl;
+        pv.load();
+      }
+      selFile=null;
+      showToast('Upload concluido!','success');
+    }
     else showToast('Erro no upload',true);
   }catch(e2){showToast('Erro no upload',true);}
 }
