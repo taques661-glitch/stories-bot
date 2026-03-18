@@ -612,13 +612,42 @@ async function handleFileSelect(e){
   }catch(e2){showToast('Erro no upload: '+e2.message,true);}
 }
 async function handlePublishFileSelect(e){
-  const f=e.target.files[0];if(!f)return;pubFile=f;
+  const f=e.target.files[0];if(!f)return;
   document.getElementById('pnow-upload-content').style.display='none';
   const badge=document.getElementById('pnow-badge');badge.style.display='block';badge.textContent=f.type.includes('video')?'VIDEO':'IMG';
-  const url=URL.createObjectURL(f);const isVid=f.type.includes('video');
-  if(isVid){document.getElementById('pnow-prev-video').src=url;document.getElementById('pnow-prev-video').style.display='block';}
-  else{document.getElementById('pnow-prev-img').src=url;document.getElementById('pnow-prev-img').style.display='block';}
-  setPhone(document.getElementById('pnow-frame-img'),document.getElementById('pnow-frame-video'),document.getElementById('pnow-empty'),url,isVid);
+  const localUrl=URL.createObjectURL(f);const isVid=f.type.includes('video');
+  if(isVid){document.getElementById('pnow-prev-video').src=localUrl;document.getElementById('pnow-prev-video').style.display='block';}
+  else{document.getElementById('pnow-prev-img').src=localUrl;document.getElementById('pnow-prev-img').style.display='block';}
+  setPhone(document.getElementById('pnow-frame-img'),document.getElementById('pnow-frame-video'),document.getElementById('pnow-empty'),localUrl,isVid);
+  // Upload direto ao Cloudinary (evita timeout do Render)
+  showToast('Fazendo upload...');
+  try{
+    const fd=new FormData();
+    fd.append('file',f);
+    fd.append('upload_preset','stories_tfx_unsigned');
+    fd.append('folder','stories_tfx');
+    const cloudName='dbwdldowa';
+    const resourceType=isVid?'video':'image';
+    const r=await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,{method:'POST',body:fd});
+    const d=await r.json();
+    if(d.error){showToast('Erro: '+d.error.message,true);return;}
+    let uploadedUrl=d.secure_url;
+    if(isVid && d.public_id){
+      showToast('Convertendo vídeo...');
+      for(let i=0;i<24;i++){
+        await new Promise(res=>setTimeout(res,5000));
+        try{
+          const chk=await fetch(`https://res.cloudinary.com/${cloudName}/video/upload/c_limit,w_1080,h_1920,q_auto:good,br_2m/${d.public_id}.mp4`,{method:'HEAD'});
+          if(chk.ok){uploadedUrl=`https://res.cloudinary.com/${cloudName}/video/upload/c_limit,w_1080,h_1920,q_auto:good,br_2m/${d.public_id}.mp4`;break;}
+        }catch(e){}
+      }
+    }
+    pubFile=null;
+    document.getElementById('pnow-url').value=uploadedUrl;
+    document.getElementById('pnow-section-url').style.display='block';
+    document.getElementById('pnow-section-upload').style.display='none';
+    showToast('Upload concluído!','success');
+  }catch(e2){showToast('Erro no upload: '+e2.message,true);}
 }
 function switchNav(v){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
