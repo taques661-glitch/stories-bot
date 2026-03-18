@@ -489,16 +489,43 @@ const IG_ID='34374106182233912';
 const MO=['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DY=['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
 let cur=new Date(),view='month',editing=null,selFile=null,pubFile=null,activeFilter=null,selected=new Set();
-let S=JSON.parse(localStorage.getItem('sb_tfx_v1')||'[]');
-if(!S.length){
-  const n=new Date(),y=n.getFullYear(),m=String(n.getMonth()+1).padStart(2,'0'),d=n.getDate();
-  S=[
-    {id:1,url:'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=700&fit=crop',date:y+'-'+m+'-'+String(d).padStart(2,'0'),time:'09:00',caption:'Story de hoje!',status:'published',repeat:'none',mediaType:'IMAGE',link:''},
-    {id:2,url:'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=700&fit=crop',date:y+'-'+m+'-'+String(d+1).padStart(2,'0'),time:'14:00',caption:'Promocao especial',status:'scheduled',repeat:'none',mediaType:'IMAGE',link:''},
-    {id:3,url:'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=400&h=700&fit=crop',date:y+'-'+m+'-'+String(d+2).padStart(2,'0'),time:'18:00',caption:'Novidades chegando',status:'scheduled',repeat:'weekly',mediaType:'IMAGE',link:''},
-  ];sv();
+let S=[];
+let _saving=false;
+
+async function loadStories(){
+  try{
+    showToast('Carregando...');
+    const r=await fetch(API+'/schedule');
+    const d=await r.json();
+    S=d.stories||[];
+    stats();
+    if(activeFilter!==null)renderList(activeFilter);else render();
+    document.getElementById('toast').classList.remove('show');
+  }catch(e){
+    // fallback to localStorage
+    S=JSON.parse(localStorage.getItem('sb_tfx_v1')||'[]');
+    stats();render();
+    showToast('Offline - usando dados locais',true);
+  }
 }
-function sv(){localStorage.setItem('sb_tfx_v1',JSON.stringify(S));stats();}
+
+async function sv(){
+  localStorage.setItem('sb_tfx_v1',JSON.stringify(S));
+  stats();
+}
+
+async function sbSave(story){
+  try{await fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(story)});}
+  catch(e){console.warn('sbSave failed',e);}
+}
+async function sbPatch(id,fields){
+  try{await fetch(API+'/schedule/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)});}
+  catch(e){console.warn('sbPatch failed',e);}
+}
+async function sbDel(id){
+  try{await fetch(API+'/schedule/'+id,{method:'DELETE'});}
+  catch(e){console.warn('sbDel failed',e);}
+}
 function stats(){
   const sc=S.filter(s=>s.status==='scheduled'||s.status==='pending').length;
   const pb=S.filter(s=>s.status==='published').length;
@@ -608,7 +635,7 @@ function mkCell(date,other){
     const eb=document.createElement('button');eb.className='pill-btn edit';eb.textContent='✎';eb.title='Editar';
     eb.onclick=e=>{e.stopPropagation();openEdit(s);};
     const db=document.createElement('button');db.className='pill-btn del';db.textContent='✕';db.title='Excluir';
-    db.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){S=S.filter(x=>x.id!==s.id);sv();render();}};
+    db.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();render();}};
     pa.appendChild(eb);pa.appendChild(db);p.appendChild(pa);
     p.onclick=e=>{if(e.target===p||e.target===txt)openEdit(s);};
     cell.appendChild(p);
@@ -667,6 +694,7 @@ function toggleSelect(id,item,cb){
 function clearSelection(){selected.clear();updateBulkBar();if(activeFilter!==null)renderList(activeFilter);}
 function bulkDelete(){
   if(!selected.size||!confirm('Excluir '+selected.size+' story(s)?'))return;
+  selected.forEach(id=>sbDel(id));
   S=S.filter(s=>!selected.has(s.id));sv();clearSelection();renderList(activeFilter);showToast('Stories excluídos','success');
 }
 function bulkReschedule(){
@@ -675,7 +703,7 @@ function bulkReschedule(){
   if(!newDate)return;
   const newTime=prompt('Novo horário (HH:MM):','09:00');
   if(!newTime)return;
-  S.forEach(s=>{if(selected.has(s.id)){s.date=newDate;s.time=newTime;s.status='scheduled';}});
+  S.forEach(s=>{if(selected.has(s.id)){s.date=newDate;s.time=newTime;s.status='scheduled';sbPatch(s.id,{date:newDate,time:newTime,status:'scheduled'});}});
   sv();clearSelection();renderList(activeFilter);showToast(selected.size+' stories reagendados','success');
 }
 function renderList(filter){
@@ -714,7 +742,7 @@ function renderList(filter){
       st.textContent={scheduled:'AGENDADO',published:'PUBLICADO',error:'FALHOU',pending:'PENDENTE'}[s.status]||s.status.toUpperCase();
       const acts=document.createElement('div');acts.className='list-actions';
       const editBtn=document.createElement('button');editBtn.className='list-btn';editBtn.textContent='Editar';editBtn.onclick=e=>{e.stopPropagation();openEdit(s);};
-      const delBtn=document.createElement('button');delBtn.className='list-btn del';delBtn.textContent='✕';delBtn.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){S=S.filter(x=>x.id!==s.id);sv();renderList(filter);}};
+      const delBtn=document.createElement('button');delBtn.className='list-btn del';delBtn.textContent='✕';delBtn.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();renderList(filter);}};
       acts.appendChild(editBtn);acts.appendChild(delBtn);
       item.appendChild(cb);item.appendChild(thumb);item.appendChild(info);item.appendChild(st);item.appendChild(acts);
       item.onclick=()=>openEdit(s);
@@ -781,7 +809,7 @@ async function saveStory(){
   }
   if(editing){
     const i=S.findIndex(s=>s.id===editing.id);
-    if(i>=0)S[i]={...S[i],url:fu,date,time,caption,repeat,mediaType:mt,link};
+    if(i>=0){S[i]={...S[i],url:fu,date,time,caption,repeat,mediaType:mt,link};await sbSave(S[i]);}
     showToast('Story atualizado','success');
   } else {
     const mk=(d,id)=>({id,url:fu,date:d,time,caption,repeat,status:'scheduled',mediaType:mt,link,ig_id:IG_ID});
@@ -791,7 +819,7 @@ async function saveStory(){
     else if(repeat==='weekdays'){let c=0,i=1;while(c<4){const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+i);if(d.getDay()!==0&&d.getDay()!==6){all.push(mk(ds(d),Date.now()+i*10));c++;}i++;}}
     else if(repeat==='monthly')for(let i=1;i<=3;i++){const d=new Date(date+'T12:00:00');d.setMonth(d.getMonth()+i);all.push(mk(ds(d),Date.now()+i*1000));}
     all.forEach(s=>S.push(s));
-    for(const s of all){if(s.url&&!s.url.includes('[arquivo')){try{fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)});}catch(e){}}}
+    for(const s of all){if(s.url&&!s.url.includes('[arquivo')){await sbSave(s);}}
     showToast(all.length>1?all.length+' stories agendados!':'Story agendado!','success');
   }
   sv();closeModal();
@@ -799,6 +827,7 @@ async function saveStory(){
 }
 function delStory(){
   if(!editing||!confirm('Excluir este story?'))return;
+  sbDel(editing.id);
   S=S.filter(s=>s.id!==editing.id);sv();closeModal();
   if(activeFilter!==null)renderList(activeFilter);else render();
   showToast('Story excluido');
@@ -808,8 +837,7 @@ function dupDay(dstr){
   const next=new Date(dstr+'T12:00:00');next.setDate(next.getDate()+7);const nextStr=ds(next);
   ss.forEach(s=>{
     const ns={...s,id:Date.now()+Math.random()*999,date:nextStr,status:'scheduled'};
-    S.push(ns);
-    if(ns.url&&!ns.url.includes('[arquivo')){try{fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ns)});}catch(e){}}
+    S.push(ns);sbSave(ns);
   });
   sv();render();showToast(ss.length+' story(s) duplicado(s) para proxima semana!','success');
 }
@@ -948,7 +976,7 @@ async function saveBulkStories(){
     }
     const story={id:Date.now()+i*7,url:mediaUrl,date:bf.assignedDay||ds(new Date()),time:bf.time||'09:00',caption,repeat:'none',status:'scheduled',mediaType,link:'',ig_id:IG_ID};
     S.push(story);
-    try{fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(story)});}catch(e){}
+    await sbSave(story);
     stepEls[i].className='progress-step done';ok++;
   }
   sv();if(activeFilter!==null)renderList(activeFilter);else render();
@@ -981,8 +1009,7 @@ async function publishNow(){
       S.push({id:Date.now(),url:pubFile?'[arquivo]':document.getElementById('pnow-url').value,date:ds(new Date()),time:new Date().toTimeString().substring(0,5),caption:'Publicado agora',status:'published',repeat:'none',mediaType:pubFile?(pubFile.type.includes('video')?'VIDEO':'IMAGE'):'IMAGE',link:''});
       sv();if(activeFilter!==null)renderList(activeFilter);else render();
       document.getElementById('modal-publish').style.display='none';
-      showToast('Story publicado!','success');
-    }else showToast('Erro: '+(data.error||'Falha'),true);
+      showToast('Story publicado!','success');    }else showToast('Erro: '+(data.error||'Falha'),true);
   }catch(e){showToast('Erro de conexao',true);}
   btn.disabled=false;btn.textContent='Publicar Agora';
   setTimeout(()=>{prog.style.display='none';fill.style.width='0%';},2000);
@@ -998,13 +1025,13 @@ setInterval(()=>{
     if(s.status==='scheduled'&&s.date===dstr&&s.time===tstr&&s.url&&!s.url.includes('[arquivo')){
       fetch(API+'/stories/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ig_id:IG_ID,media_url:s.url,media_type:s.mediaType||'IMAGE'})})
         .then(r=>r.json()).then(d=>{
-          if(d.success){s.status='published';sv();if(activeFilter!==null)renderList(activeFilter);else render();showToast('Story de '+s.time+' publicado!','success');}
-          else{s.status='error';sv();}
+          if(d.success){s.status='published';sbPatch(s.id,{status:'published'});sv();if(activeFilter!==null)renderList(activeFilter);else render();showToast('Story de '+s.time+' publicado!','success');}
+          else{s.status='error';sbPatch(s.id,{status:'error'});sv();}
         }).catch(()=>{});
     }
   });
 },60000);
-render();stats();
+render();stats();loadStories();
 </script>
 </body>
 </html>

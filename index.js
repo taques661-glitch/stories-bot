@@ -22,121 +22,215 @@ const IG_TOKEN = process.env.IG_TOKEN;
 const IG_ID = process.env.IG_ID;
 const PORT = process.env.PORT || 3001;
 
+// SUPABASE
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://uhayvtncounslqlchtpz.supabase.co";
+const SUPABASE_KEY = process.env.SUPABASE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoYXl2dG5jb3Vuc2xxbGNodHB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNzk2NTksImV4cCI6MjA4ODc1NTY1OX0.E7HLAXBChvUeEhxi-Dp1TryIOfQN4P1Na4egj09KSpA";
+
+const sbHeaders = {
+  "Content-Type": "application/json",
+  "apikey": SUPABASE_KEY,
+  "Authorization": `Bearer ${SUPABASE_KEY}`,
+  "Prefer": "return=representation"
+};
+
+async function sbGet(query = "") {
+  const r = await axios.get(`${SUPABASE_URL}/rest/v1/stories_tfx?${query}&order=date.asc,time.asc`, { headers: sbHeaders });
+  return r.data;
+}
+async function sbUpsert(story) {
+  const row = {
+    id: story.id,
+    ig_id: story.ig_id || IG_ID,
+    url: story.url,
+    date: story.date,
+    time: story.time,
+    caption: story.caption || "",
+    status: story.status || "scheduled",
+    media_type: story.mediaType || story.media_type || "IMAGE",
+    repeat_rule: story.repeat || "none",
+    link: story.link || ""
+  };
+  await axios.post(`${SUPABASE_URL}/rest/v1/stories_tfx`, row, {
+    headers: { ...sbHeaders, "Prefer": "resolution=merge-duplicates,return=representation" }
+  });
+}
+async function sbUpdate(id, fields) {
+  await axios.patch(`${SUPABASE_URL}/rest/v1/stories_tfx?id=eq.${id}`, fields, { headers: sbHeaders });
+}
+async function sbDelete(id) {
+  await axios.delete(`${SUPABASE_URL}/rest/v1/stories_tfx?id=eq.${id}`, { headers: sbHeaders });
+}
+
 app.get("/api", (req, res) => res.json({ status: "ok" }));
 app.get("/health", (req, res) => res.sendStatus(200));
 app.get("/accounts", (req, res) => {
   res.json({ accounts: [{ ig_id: IG_ID, username: "ktsmartsam", followers: 0 }] });
 });
 
-async function publishStory(ig_id, mediaUrl, mediaType, token) {
-  const isVideo = mediaType === "VIDEO";
-  const c = await axios.post(
-    "https://graph.instagram.com/v21.0/" + ig_id + "/media?" +
-    new URLSearchParams({ access_token: token, media_type: "STORIES", [isVideo ? "video_url" : "image_url"]: mediaUrl }).toString()
-  );
-  const creationId = c.data.id;
-  if (isVideo) {
-    for (let i = 0; i < 12; i++) {
-      await sleep(5000);
-      const s = await axios.get("https://graph.instagram.com/v21.0/" + creationId + "?fields=status_code&access_token=" + token);
-      if (s.data.status_code === "FINISHED") break;
-      if (s.data.status_code === "ERROR") throw new Error("Erro no video");
-    }
-  } else {
-    await sleep(5000);
-  }
-  const p = await axios.post(
-    "https://graph.instagram.com/v21.0/" + ig_id + "/media_publish?" +
-    new URLSearchParams({ creation_id: creationId, access_token: token }).toString()
-  );
-  return { media_id: p.data.id };
-}
-
-
-app.post('/upload', upload.single('file'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo' });
+// GET stories from Supabase
+app.get("/schedule", async (req, res) => {
   try {
-    const mediaType = req.file.mimetype.includes('video') ? 'VIDEO' : 'IMAGE';
-    const resourceType = mediaType === 'VIDEO' ? 'video' : 'image';
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { resource_type: resourceType, folder: 'stories-bot' },
-        (error, result) => error ? reject(error) : resolve(result)
-      );
-      stream.end(req.file.buffer);
-    });
-    console.log('Upload OK:', result.secure_url);
-    res.json({ success: true, url: result.secure_url, mediaType });
-  } catch(err) {
-    console.error('Erro upload:', err.message);
-    res.status(500).json({ error: 'Erro no upload' });
+    const rows = await sbGet("select=*");
+    const stories = rows.map(r => ({
+      id: r.id,
+      ig_id: r.ig_id,
+      url: r.url,
+      date: r.date,
+      time: r.time,
+      caption: r.caption,
+      status: r.status,
+      mediaType: r.media_type,
+      repeat: r.repeat_rule,
+      link: r.link || ""
+    }));
+    res.json({ stories });
+  } catch (e) {
+    console.error("sbGet error:", e.message);
+    res.json({ stories: [] });
   }
 });
 
+// POST - save story to Supabase
+app.post("/schedule", async (req, res) => {
+  try {
+    await sbUpsert(req.body);
+    res.json({ success: true });
+  } catch (e) {
+    console.error("sbUpsert error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH - update story
+app.patch("/schedule/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const fields = {};
+    if (req.body.status) fields.status = req.body.status;
+    if (req.body.date) fields.date = req.body.date;
+    if (req.body.time) fields.time = req.body.time;
+    if (req.body.caption !== undefined) fields.caption = req.body.caption;
+    if (req.body.url) fields.url = req.body.url;
+    if (req.body.link !== undefined) fields.link = req.body.link;
+    if (req.body.mediaType) fields.media_type = req.body.mediaType;
+    await sbUpdate(id, fields);
+    res.json({ success: true });
+  } catch (e) {
+    console.error("sbUpdate error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE story
+app.delete("/schedule/:id", async (req, res) => {
+  try {
+    await sbDelete(req.params.id);
+    res.json({ success: true });
+  } catch (e) {
+    console.error("sbDelete error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// UPLOAD to Cloudinary
+app.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file" });
+    const isVideo = req.file.mimetype.startsWith("video");
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { resource_type: isVideo ? "video" : "image", folder: "stories_tfx" },
+        (err, result) => err ? reject(err) : resolve(result)
+      );
+      stream.end(req.file.buffer);
+    });
+    res.json({ url: result.secure_url, mediaType: isVideo ? "VIDEO" : "IMAGE" });
+  } catch (e) {
+    console.error("Upload error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUBLISH story to Instagram
 app.post("/stories/publish", upload.single("file"), async (req, res) => {
-  const ig_id = req.body.ig_id || IG_ID;
-  const token = IG_TOKEN;
-  let mediaUrl = req.body.media_url;
-  let mediaType = (req.body.media_type || "IMAGE").toUpperCase();
-
-  if (req.file) {
-    console.log("Upload recebido:", req.file.originalname, req.file.mimetype);
-    mediaType = req.file.mimetype.includes("video") ? "VIDEO" : "IMAGE";
-    const resourceType = mediaType === "VIDEO" ? "video" : "image";
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { resource_type: resourceType, folder: "stories-bot" },
-        (error, result) => error ? reject(error) : resolve(result)
-      );
-      stream.end(req.file.buffer);
-    });
-    mediaUrl = result.secure_url;
-    console.log("Cloudinary URL:", mediaUrl);
-  }
-
-  if (!mediaUrl) return res.status(400).json({ error: "Nenhuma midia enviada" });
-  console.log("Publicando:", mediaUrl, mediaType);
-
   try {
-    const result = await publishStory(ig_id, mediaUrl, mediaType, token);
-    console.log("Publicado:", result.media_id);
-    res.json({ success: true, media_id: result.media_id, media_url: mediaUrl });
-  } catch (err) {
-    console.error("Erro:", err.response?.data || err.message);
-    res.status(500).json({ error: "Falha", details: err.response?.data });
+    const token = IG_TOKEN;
+    const igId = req.body?.ig_id || IG_ID;
+    let mediaUrl = req.body?.media_url;
+    let mediaType = req.body?.media_type || "IMAGE";
+
+    if (req.file) {
+      const isVideo = req.file.mimetype.startsWith("video");
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { resource_type: isVideo ? "video" : "image", folder: "stories_tfx" },
+          (err, r) => err ? reject(err) : resolve(r)
+        );
+        stream.end(req.file.buffer);
+      });
+      mediaUrl = result.secure_url;
+      mediaType = isVideo ? "VIDEO" : "IMAGE";
+    }
+
+    if (!mediaUrl) return res.status(400).json({ error: "No media URL" });
+
+    const isVideo = mediaType === "VIDEO";
+    const containerRes = await axios.post(
+      `https://graph.facebook.com/v19.0/${igId}/media`,
+      {
+        [isVideo ? "video_url" : "image_url"]: mediaUrl,
+        media_type: "STORIES",
+        access_token: token
+      }
+    );
+    const containerId = containerRes.data.id;
+    await sleep(isVideo ? 8000 : 3000);
+
+    await axios.post(
+      `https://graph.facebook.com/v19.0/${igId}/media_publish`,
+      { creation_id: containerId, access_token: token }
+    );
+    res.json({ success: true });
+  } catch (e) {
+    console.error("Publish error:", e.response?.data || e.message);
+    res.status(500).json({ error: e.response?.data?.error?.message || e.message });
   }
 });
 
-
-const cron = require('node-cron');
-cron.schedule('* * * * *', async () => {
-  const now = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  const manaus = new Date(now.toLocaleString('en-US', {timeZone:'America/Manaus'}));
-  const dateStr = manaus.getFullYear()+'-'+pad(manaus.getMonth()+1)+'-'+pad(manaus.getDate());
-  const timeStr = pad(manaus.getHours())+':'+pad(manaus.getMinutes());
-  console.log('Cron:', dateStr, timeStr, 'pending:', scheduled.filter(s=>s.status==='pending').length);
-  const toPublish = scheduled.filter(s => s.status==='pending' && s.date===dateStr && s.time===timeStr);
-  for(const story of toPublish){
-    try{
-      await publishStory(story.ig_id||IG_ID, story.url, story.mediaType||'IMAGE', IG_TOKEN);
-      story.status='published';
-      console.log('Publicado agendado:', story.id);
-    }catch(err){story.status='error';console.error('Erro agendado:', err.message);}
+// CRON - publish scheduled stories
+setInterval(async () => {
+  try {
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0];
+    const timeStr = now.toTimeString().substring(0, 5);
+    const rows = await sbGet(`status=eq.scheduled&date=eq.${dateStr}&time=eq.${timeStr}`);
+    for (const row of rows) {
+      if (!row.url || row.url.includes("[arquivo")) continue;
+      try {
+        const isVideo = row.media_type === "VIDEO";
+        const containerRes = await axios.post(
+          `https://graph.facebook.com/v19.0/${row.ig_id || IG_ID}/media`,
+          {
+            [isVideo ? "video_url" : "image_url"]: row.url,
+            media_type: "STORIES",
+            access_token: IG_TOKEN
+          }
+        );
+        await sleep(isVideo ? 8000 : 3000);
+        await axios.post(
+          `https://graph.facebook.com/v19.0/${row.ig_id || IG_ID}/media_publish`,
+          { creation_id: containerRes.data.id, access_token: IG_TOKEN }
+        );
+        await sbUpdate(row.id, { status: "published" });
+        console.log(`Published story ${row.id}`);
+      } catch (e) {
+        console.error(`Failed story ${row.id}:`, e.response?.data || e.message);
+        await sbUpdate(row.id, { status: "error" });
+      }
+    }
+  } catch (e) {
+    console.error("Cron error:", e.message);
   }
-  const pending = scheduled.filter(s => s.status==='pending' && s.date===dateStr && s.time===timeStr);
-  for(const story of pending){
-    try{
-      await publishStory(story.ig_id||IG_ID, story.url, story.mediaType||'IMAGE', IG_TOKEN);
-      story.status='published';
-      console.log('Publicado agendado:', story.id);
-    }catch(err){story.status='error';console.error('Erro agendado:', err.message);}
-  }
-});
-app.listen(PORT, "0.0.0.0", () => console.log("Stories Bot porta " + PORT));
+}, 60000);
 
-// Storage de agendamentos
-let scheduled = [];
-app.post('/schedule', (req, res) => { scheduled.push({...req.body, status:'pending'}); res.json({success:true}); });
-app.get('/schedule', (req, res) => { res.json({scheduled}); });
-app.delete('/schedule/:id', (req, res) => { scheduled = scheduled.map(s => s.id==req.params.id?{...s,status:'cancelled'}:s); res.json({success:true}); });
+app.listen(PORT, () => console.log(`Stories TFX rodando na porta ${PORT}`));
