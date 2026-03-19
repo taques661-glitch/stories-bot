@@ -268,7 +268,7 @@ setInterval(async () => {
         console.log(`[Cleanup] Story ${row.id} travado em publishing — marcado como error`);
       }
     }
-  } catch(e) { console.error("Cleanup error:", e.message); }
+  } catch(e) { console.error("Cleanup error:", e.message, e.response?.data); }
 }, 5 * 60 * 1000); // a cada 5 minutos
 
 // CRON - publish scheduled stories (servidor)
@@ -341,7 +341,7 @@ setInterval(async () => {
       }
     }
   } catch (e) {
-    console.error("Cron error:", e.message);
+    console.error("Cron error:", e.message, e.response?.data);
   }
 }, 60000);
 
