@@ -87,6 +87,24 @@ async function waitForVideo(containerId, token) {
 }
 
 app.get("/api", (req, res) => res.json({ status: "ok" }));
+// Verifica expiração do token diariamente
+const TOKEN_EXPIRY = new Date('2026-05-17');
+setInterval(async () => {
+  const daysLeft = Math.ceil((TOKEN_EXPIRY - new Date()) / (1000 * 60 * 60 * 24));
+  if (daysLeft <= 7) {
+    console.warn(`[Token] ⚠️ Token do Instagram expira em ${daysLeft} dia(s)! Renove em: https://developers.facebook.com/tools/explorer`);
+  }
+}, 24 * 60 * 60 * 1000);
+
+app.get("/token-status", (req, res) => {
+  const daysLeft = Math.ceil((TOKEN_EXPIRY - new Date()) / (1000 * 60 * 60 * 24));
+  res.json({ expiry: TOKEN_EXPIRY.toISOString().split('T')[0], daysLeft, ok: daysLeft > 7 });
+});
+
+app.get("/config", (req, res) => res.json({
+  cloudName: process.env.CLOUDINARY_CLOUD_NAME || "dbwdldowa",
+  uploadPreset: "stories_tfx_unsigned"
+}));
 app.get("/health", (req, res) => res.sendStatus(200));
 app.get("/accounts", (req, res) => {
   res.json({ accounts: [{ ig_id: IG_ID, username: "ktsmartsam", followers: 0 }] });
@@ -314,5 +332,21 @@ app.get("/publish-due", async (req, res) => {
 });
 
 // Cron interno removido — publicação feita via /publish-due chamado pelo cron-job.org a cada minuto
+
+// RETRY — tenta republicar stories com erro nas últimas 2 horas (1x por hora)
+setInterval(async () => {
+  try {
+    const rows = await sbGet("status=eq.error");
+    const now = Date.now();
+    for (const row of rows) {
+      if (!row.url || row.url.includes("[arquivo")) continue;
+      // Só retenta se o horário agendado foi nas últimas 2 horas
+      const scheduledTime = new Date(row.date + 'T' + row.time + ':00').getTime();
+      if (now - scheduledTime > 2 * 60 * 60 * 1000) continue;
+      console.log(`[Retry] Tentando republicar story ${row.id}`);
+      await sbUpdate(row.id, { status: "scheduled" });
+    }
+  } catch(e) { console.error("Retry error:", e.message); }
+}, 60 * 60 * 1000); // a cada 1 hora
 
 app.listen(PORT, () => console.log(`Stories TFX rodando na porta ${PORT}`));

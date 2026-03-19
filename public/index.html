@@ -292,6 +292,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <div class="stat-icon" style="background:var(--red-dim)">&#10060;</div>
         <div><div class="stat-label">Falhos</div><div class="stat-value" style="color:var(--red)" id="stat-err">0</div></div>
       </div>
+      <div class="stat-card" style="flex:none;padding:10px 14px;min-width:120px">
+        <div class="stat-icon" style="background:rgba(255,255,255,0.05)">📅</div>
+        <div><div class="stat-label">Hoje</div><div class="stat-value" id="stat-hoje" style="font-size:14px">0/0</div></div>
+      </div>
       <button class="btn-publish" onclick="openPublishNow()">&#9654; Publicar Agora</button>
     </div>
     <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
@@ -492,15 +496,30 @@ let cur=new Date(),view='month',editing=null,selFile=null,pubFile=null,activeFil
 let S=[];
 let _saving=false;
 
+let _lastErrorIds=new Set();
 async function loadStories(silent=false){
   try{
     if(!silent)showToast('Carregando...');
     const r=await fetch(API+'/schedule');
     const d=await r.json();
+    const prev=S;
     S=d.stories||[];
     stats();
     if(activeFilter!==null)renderList(activeFilter);else render();
     if(!silent)document.getElementById('toast').classList.remove('show');
+    // Notifica falhas novas
+    if(silent){
+      S.filter(s=>s.status==='error').forEach(s=>{
+        if(!_lastErrorIds.has(s.id)){
+          showToast('⚠️ Story de '+s.time+' falhou ao publicar!',true);
+          // Notificação do browser se permitido
+          if(Notification&&Notification.permission==='granted'){
+            new Notification('Stories TFX',{body:'Story de '+s.time+' falhou!',icon:'/favicon.ico'});
+          }
+        }
+      });
+      _lastErrorIds=new Set(S.filter(s=>s.status==='error').map(s=>s.id));
+    }
   }catch(e){
     // fallback to localStorage
     S=JSON.parse(localStorage.getItem('sb_tfx_v1')||'[]');
@@ -538,6 +557,12 @@ function stats(){
   document.getElementById('nc-sched').textContent=sc;
   document.getElementById('nc-pub').textContent=pb;
   document.getElementById('nc-err').textContent=er;
+  // Contador do dia
+  const today=ds(new Date());
+  const todayAll=S.filter(s=>s.date===today);
+  const todayPub=todayAll.filter(s=>s.status==='published').length;
+  const el=document.getElementById('stat-hoje');
+  if(el)el.textContent=todayPub+'/'+todayAll.length;
 }
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebar-overlay').classList.toggle('show');}
 function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebar-overlay').classList.remove('show');}
@@ -558,6 +583,12 @@ async function handleFileSelect(e){
   if(isVid){document.getElementById('upload-prev-video').src=url;document.getElementById('upload-prev-video').style.display='block';}
   else{document.getElementById('upload-prev-img').src=url;document.getElementById('upload-prev-img').style.display='block';}
   setPhone(document.getElementById('pv-img'),document.getElementById('pv-video'),document.getElementById('pv-empty'),url,isVid);
+  // Aviso para vídeos grandes no celular
+  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if(isMobile && f.size > 50*1024*1024){
+    showToast('Vídeos acima de 50MB: use o computador para enviar!',true);
+    return;
+  }
   showToast('Fazendo upload...');
   try{
     const isVid2=f.type.includes('video');
@@ -725,7 +756,23 @@ function mkCell(date,other){
     eb.onclick=e=>{e.stopPropagation();openEdit(s);};
     const db=document.createElement('button');db.style.cssText='width:14px;height:14px;border-radius:2px;background:rgba(248,113,113,0.9);border:none;font-size:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white';db.textContent='✕';
     db.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();render();}};
-    acts.appendChild(eb);acts.appendChild(db);t.appendChild(acts);
+    acts.appendChild(eb);acts.appendChild(db);
+    if(s.status==='error'){
+      const rb=document.createElement('button');
+      rb.style.cssText='width:14px;height:14px;border-radius:2px;background:rgba(232,200,74,0.9);border:none;font-size:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#000';
+      rb.textContent='↺';rb.title='Reagendar';
+      rb.onclick=e=>{
+        e.stopPropagation();
+        const newDate=prompt('Nova data (YYYY-MM-DD):',s.date);if(!newDate)return;
+        const newTime=prompt('Novo horário (HH:MM):',s.time);if(!newTime)return;
+        sbPatch(s.id,{status:'scheduled',date:newDate,time:newTime});
+        const i=S.findIndex(x=>x.id===s.id);
+        if(i>=0){S[i].status='scheduled';S[i].date=newDate;S[i].time=newTime;}
+        sv();render();showToast('Story reagendado!','success');
+      };
+      acts.appendChild(rb);
+    }
+    t.appendChild(acts);
     t.addEventListener('mouseenter',()=>acts.style.display='flex');
     t.addEventListener('mouseleave',()=>acts.style.display='none');
     t.onclick=e=>{if(e.target===t||e.target.tagName==='VIDEO'||e.target.tagName==='IMG')openEdit(s);};
@@ -1190,6 +1237,16 @@ function showToast(msg,type){
 // Sincroniza status a cada 30s para refletir publicados/falhos do servidor
 setInterval(()=>loadStories(true), 30000);
 render();stats();loadStories();
+// Verifica status do token
+fetch(API+'/token-status').then(r=>r.json()).then(d=>{
+  if(d.daysLeft<=7){
+    showToast('⚠️ Token Instagram expira em '+d.daysLeft+' dias! Renove agora.',true);
+  }
+}).catch(()=>{});
+// Solicita permissão para notificações do browser
+if(typeof Notification!=='undefined'&&Notification.permission==='default'){
+  Notification.requestPermission();
+}
 </script>
 </body>
 </html>
