@@ -847,8 +847,11 @@ function closeModal(){document.getElementById('modal').style.display='none';edit
 function updateRepeatHint(){const r=document.getElementById('input-repeat').value,h=document.getElementById('repeat-hint');const m={daily:'7 dias seguidos',weekly:'4 semanas',weekdays:'5 dias uteis',monthly:'3 meses'};h.textContent=m[r]||'';h.style.display=r!=='none'?'block':'none';}
 function addDays(d,n){const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return ds(x);}
 async function saveStory(){
+  if(_saving){return;}
+  _saving=true;
+  try{
   const date=document.getElementById('input-date').value,time=document.getElementById('input-time').value,caption=document.getElementById('input-caption').value,repeat=document.getElementById('input-repeat').value,url=document.getElementById('input-url').value,link=document.getElementById('input-link').value;
-  if(!date||!time){showToast('Preencha data e horario!',true);return;}
+  if(!date||!time){showToast('Preencha data e horario!',true);_saving=false;return;}
   let mt=url.toLowerCase().includes('.mp4')?'VIDEO':'IMAGE';
   let fu=url;
   if(selFile){
@@ -885,6 +888,7 @@ async function saveStory(){
     await loadStories();
   }
   sv();closeModal();
+  }finally{_saving=false;}
 }
 function delStory(){
   if(!editing||!confirm('Excluir este story?'))return;
