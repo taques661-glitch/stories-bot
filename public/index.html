@@ -881,9 +881,9 @@ async function saveStory(){
     else if(repeat==='weekly')for(let i=1;i<=3;i++)all.push(mk(addDays(date,7*i),Date.now()+i*100));
     else if(repeat==='weekdays'){let c=0,i=1;while(c<4){const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+i);if(d.getDay()!==0&&d.getDay()!==6){all.push(mk(ds(d),Date.now()+i*10));c++;}i++;}}
     else if(repeat==='monthly')for(let i=1;i<=3;i++){const d=new Date(date+'T12:00:00');d.setMonth(d.getMonth()+i);all.push(mk(ds(d),Date.now()+i*1000));}
-    all.forEach(s=>S.push(s));
     for(const s of all){if(s.url&&!s.url.includes('[arquivo')){await sbSave(s);}}
     showToast(all.length>1?all.length+' stories agendados!':'Story agendado!','success');
+    await loadStories();
   }
   sv();closeModal();
   if(activeFilter!==null)renderList(activeFilter);else render();
