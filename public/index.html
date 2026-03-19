@@ -885,7 +885,6 @@ async function saveStory(){
     await loadStories();
   }
   sv();closeModal();
-  if(activeFilter!==null)renderList(activeFilter);else render();
 }
 function delStory(){
   if(!editing||!confirm('Excluir este story?'))return;
