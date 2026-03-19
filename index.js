@@ -277,7 +277,14 @@ setInterval(async () => {
     const now = new Date();
     const dateStr = now.toISOString().split("T")[0];
     const timeStr = now.toTimeString().substring(0, 5);
-    const rows = await sbGet(`status=eq.scheduled&date=eq.${dateStr}&time=eq.${timeStr}`);
+    // Verifica também os 3 minutos anteriores para cobrir atraso do servidor ao acordar
+    const times = [];
+    for(let i = 0; i <= 3; i++) {
+      const t = new Date(now - i * 60000);
+      times.push(t.toTimeString().substring(0, 5));
+    }
+    const timeFilter = times.map(t => `time=eq.${t}`).join(',');
+    const rows = await sbGet(`status=eq.scheduled&date=eq.${dateStr}&or=(${timeFilter})`);
 
     for (const row of rows) {
       if (!row.url || row.url.includes("[arquivo")) continue;
