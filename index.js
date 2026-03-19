@@ -282,8 +282,8 @@ setInterval(async () => {
     for (const row of rows) {
       if (!row.url || row.url.includes("[arquivo")) continue;
 
-      // Marca como error temporariamente para evitar dupla publicação
-      await sbUpdate(row.id, { status: "error" });
+      // Marca como publishing para evitar dupla publicação
+      await sbUpdate(row.id, { status: "publishing" });
 
       try {
         const isVideo = row.media_type === "VIDEO";
