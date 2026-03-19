@@ -1048,13 +1048,21 @@ async function saveBulkStories(){
         fd.append('folder','stories_tfx');
         const cloudName='dbwdldowa';
         const resourceType=isVid2?'video':'image';
-        const r=await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,{method:'POST',body:fd});
-        const d=await r.json();
+        const d=await new Promise((resolve,reject)=>{
+          const xhr=new XMLHttpRequest();
+          xhr.open('POST',`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`);
+          xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);stepEls[i].textContent=stepEls[i].textContent.split(' ')[0]+' '+pct+'%';}};
+          xhr.onload=()=>{try{resolve(JSON.parse(xhr.responseText));}catch(e){reject(new Error('Resposta inválida'));}};
+          xhr.onerror=()=>reject(new Error('Erro de conexão'));
+          xhr.timeout=300000;
+          xhr.ontimeout=()=>reject(new Error('Timeout'));
+          xhr.send(fd);
+        });
         if(d.error) throw new Error(d.error.message);
         mediaUrl=d.secure_url;
         if(isVid2) mediaUrl=mediaUrl.replace(/\.[^.]+$/, '.mp4');
         mediaType=isVid2?'VIDEO':'IMAGE';
-      }catch(e){stepEls[i].className='progress-step fail';fail++;continue;}
+      }catch(e){stepEls[i].className='progress-step fail';stepEls[i].title=e.message;fail++;continue;}
     }
     const story={id:Date.now()+i*7,url:mediaUrl,date:bf.assignedDay||ds(new Date()),time:bf.time||'09:00',caption,repeat:'none',status:'scheduled',mediaType,link:'',ig_id:IG_ID};
     await sbSave(story);
