@@ -778,6 +778,8 @@ function renderList(filter){
     if(selected.size===filtered.length){filtered.forEach(s=>selected.delete(s.id));}
     else{filtered.forEach(s=>selected.add(s.id));}
     updateBulkBar();renderList(filter);
+    // Garante que a barra apareça após re-render
+    setTimeout(updateBulkBar, 50);
   };
   selRow.appendChild(selCb);selRow.appendChild(selLabel);wrap.appendChild(selRow);
   const grouped={};filtered.forEach(s=>{if(!grouped[s.date])grouped[s.date]=[];grouped[s.date].push(s);});
@@ -792,8 +794,16 @@ function renderList(filter){
       const cb=document.createElement('div');cb.className='list-cb'+(selected.has(s.id)?' checked':'');cb.textContent=selected.has(s.id)?'✓':'';
       cb.onclick=e=>{e.stopPropagation();toggleSelect(s.id,item,cb);};
       const thumb=document.createElement('div');thumb.className='list-thumb';
-      if(s.url&&s.url.startsWith('http')&&s.mediaType!=='VIDEO'){const img=document.createElement('img');img.src=s.url;img.onerror=()=>{thumb.textContent='🖼';};thumb.appendChild(img);}
-      else thumb.textContent=s.mediaType==='VIDEO'?'🎥':'🖼';
+      if(s.url&&s.url.startsWith('http')&&s.mediaType==='VIDEO'){
+        const vid=document.createElement('video');
+        vid.src=s.url;vid.muted=true;vid.preload='metadata';
+        vid.style.cssText='width:100%;height:100%;object-fit:cover';
+        vid.addEventListener('loadedmetadata',()=>{vid.currentTime=1;});
+        thumb.appendChild(vid);
+      } else if(s.url&&s.url.startsWith('http')&&s.mediaType!=='VIDEO'){
+        const img=document.createElement('img');img.src=s.url;
+        img.onerror=()=>{thumb.textContent='🖼';};thumb.appendChild(img);
+      } else thumb.textContent=s.mediaType==='VIDEO'?'🎥':'🖼';
       const info=document.createElement('div');info.className='list-info';
       info.innerHTML='<div class="list-caption">'+(s.caption||'Sem legenda')+'</div><div class="list-meta">'+s.time+(s.link?' · Link':'')+' · '+s.mediaType+'</div>';
       const st=document.createElement('div');st.className='list-status '+s.status;
