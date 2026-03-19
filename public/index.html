@@ -492,15 +492,15 @@ let cur=new Date(),view='month',editing=null,selFile=null,pubFile=null,activeFil
 let S=[];
 let _saving=false;
 
-async function loadStories(){
+async function loadStories(silent=false){
   try{
-    showToast('Carregando...');
+    if(!silent)showToast('Carregando...');
     const r=await fetch(API+'/schedule');
     const d=await r.json();
     S=d.stories||[];
     stats();
     if(activeFilter!==null)renderList(activeFilter);else render();
-    document.getElementById('toast').classList.remove('show');
+    if(!silent)document.getElementById('toast').classList.remove('show');
   }catch(e){
     // fallback to localStorage
     S=JSON.parse(localStorage.getItem('sb_tfx_v1')||'[]');
@@ -854,20 +854,19 @@ async function saveStory(){
   if(selFile){
     showToast('Fazendo upload...');
     try{
-    const isVid2=f.type.includes('video');
-    const fd=new FormData();
-    fd.append('file',f);
-    fd.append('upload_preset','stories_tfx_unsigned');
-    fd.append('folder','stories_tfx');
-    const cloudName='dbwdldowa';
-    const resourceType=isVid2?'video':'image';
-    const r=await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,{method:'POST',body:fd});
-    const d=await r.json();
-    if(d.error) throw new Error(d.error.message);
-    let fu=d.secure_url;
-    if(isVid2) fu=fu.replace(/\.[^.]+$/, '.mp4');
-    const mt=isVid2?'VIDEO':'IMAGE';
-    fu=fu;
+      const isVid2=selFile.type.includes('video');
+      const fd=new FormData();
+      fd.append('file',selFile);
+      fd.append('upload_preset','stories_tfx_unsigned');
+      fd.append('folder','stories_tfx');
+      const cloudName='dbwdldowa';
+      const resourceType=isVid2?'video':'image';
+      const r=await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,{method:'POST',body:fd});
+      const d=await r.json();
+      if(d.error) throw new Error(d.error.message);
+      fu=d.secure_url;
+      if(isVid2) fu=fu.replace(/\.[^.]+$/, '.mp4');
+      mt=isVid2?'VIDEO':'IMAGE';
     }catch(e){showToast('Erro no upload: '+e.message,true);return;}
   }
   if(editing){
@@ -902,7 +901,7 @@ function dupDay(dstr){
     const ns={...s,id:Date.now()+Math.random()*999,date:nextStr,status:'scheduled'};
     S.push(ns);sbSave(ns);
   });
-  sv();render();showToast(ss.length+' story(s) duplicado(s) para proxima semana!','success');
+  sv();loadStories();showToast(ss.length+' story(s) duplicado(s) para proxima semana!','success');
 }
 // BULK SCHEDULE v2
 let bulkFiles=[],bulkSelectedDays=new Set(),bulkCalDate=new Date();
@@ -1047,11 +1046,10 @@ async function saveBulkStories(){
       }catch(e){stepEls[i].className='progress-step fail';fail++;continue;}
     }
     const story={id:Date.now()+i*7,url:mediaUrl,date:bf.assignedDay||ds(new Date()),time:bf.time||'09:00',caption,repeat:'none',status:'scheduled',mediaType,link:'',ig_id:IG_ID};
-    S.push(story);
     await sbSave(story);
     stepEls[i].className='progress-step done';ok++;
   }
-  sv();if(activeFilter!==null)renderList(activeFilter);else render();
+  await loadStories();
   showToast(ok+' stories agendados'+(fail?' ('+fail+' erros)':'')+'!','success');
   btn.disabled=false;btn.style.opacity='1';
   setTimeout(()=>closeBulkModal(),1800);
@@ -1091,7 +1089,7 @@ function showToast(msg,type){
   t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3500);
 }
 // Sincroniza status a cada 30s para refletir publicados/falhos do servidor
-setInterval(loadStories, 30000);
+setInterval(()=>loadStories(true), 30000);
 render();stats();loadStories();
 </script>
 </body>
