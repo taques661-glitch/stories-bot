@@ -807,13 +807,33 @@ function renderWeek(){
     const date=new Date(st);date.setDate(date.getDate()+d);
     const dstr=ds(date),ss=S.filter(s=>s.date===dstr);
     const col=document.createElement('div');col.className='week-col';col.style.cssText='border-left:1px solid var(--border);overflow-y:auto;min-height:200px';
+    col.addEventListener('dragover',e=>{e.preventDefault();col.style.background='rgba(232,200,74,0.08)';});
+    col.addEventListener('dragleave',()=>{col.style.background='';});
+    col.addEventListener('drop',async e=>{
+      e.preventDefault();col.style.background='';
+      const storyId=Number(e.dataTransfer.getData('storyId'));
+      const story=S.find(x=>x.id===storyId);
+      if(!story||story.date===dstr)return;
+      const newTime=prompt('Horário no novo dia (HH:MM):',story.time);
+      if(!newTime)return;
+      story.date=dstr;story.time=newTime;
+      await sbPatch(storyId,{date:dstr,time:newTime});
+      sv();render();showToast('Story movido para '+dstr+'!','success');
+    });
 
     // Mostra todos os stories do dia como coluna de thumbnails
     const thumbCol=document.createElement('div');
     thumbCol.style.cssText='display:flex;flex-direction:column;gap:3px;padding:3px;overflow-y:auto;height:100%';
     ss.forEach(s=>{
       const t=document.createElement('div');
-      t.style.cssText='position:relative;border-radius:4px;overflow:hidden;aspect-ratio:9/16;background:#1a1a1a;cursor:pointer;flex-shrink:0;border:1px solid rgba(255,255,255,0.06)';
+      t.style.cssText='position:relative;border-radius:4px;overflow:hidden;aspect-ratio:9/16;background:#1a1a1a;cursor:grab;flex-shrink:0;border:1px solid rgba(255,255,255,0.06)';
+      t.draggable=true;
+      t.addEventListener('dragstart',e=>{
+        e.dataTransfer.setData('storyId',String(s.id));
+        e.dataTransfer.effectAllowed='move';
+        t.style.opacity='0.4';
+      });
+      t.addEventListener('dragend',()=>{t.style.opacity='1';});
       const colors={scheduled:'#e8c84a',publishing:'#e8c84a',published:'#4ade80',error:'#f87171',pending:'#e8c84a'};
       t.style.borderColor=colors[s.status]||'rgba(255,255,255,0.06)';
       if(s.url&&s.url.startsWith('http')){
