@@ -1308,16 +1308,21 @@ function renderDupCal(){
 async function confirmDup(){
   const ss=S.filter(s=>s.date===dupSrcDate);
   if(!ss.length){showToast('Nenhum story no dia selecionado',true);return;}
-  let count=0;
-  for(const targetDate of dupTargetDays){
+  let count=0,fail=0;
+  for(const targetDate of [...dupTargetDays]){
     for(const s of ss){
-      const ns={...s,id:Date.now()+Math.random()*9999,date:targetDate,status:'scheduled'};
-      await sbSave(ns);count++;
+      const ns={id:Date.now()+Math.floor(Math.random()*999999),url:s.url,date:targetDate,time:s.time,caption:s.caption||'',repeat:'none',status:'scheduled',mediaType:s.mediaType,link:s.link||'',ig_id:s.ig_id||IG_ID};
+      try{
+        const r=await fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ns)});
+        const d=await r.json();
+        if(d.success){count++;}else{fail++;console.error('sbSave fail:',d);}
+      }catch(e){fail++;console.error('sbSave error:',e);}
     }
   }
   closeDupModal();
   await loadStories();
-  showToast(count+' story(s) duplicado(s) para '+dupTargetDays.size+' dia(s)!','success');
+  if(fail>0)showToast(count+' duplicado(s), '+fail+' erro(s)',true);
+  else showToast(count+' story(s) duplicado(s) para '+dupTargetDays.size+' dia(s)!','success');
 }
 
 // Sincroniza status a cada 30s para refletir publicados/falhos do servidor
