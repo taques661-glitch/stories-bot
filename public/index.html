@@ -567,10 +567,18 @@ async function handleFileSelect(e){
     fd.append('folder','stories_tfx');
     const cloudName='dbwdldowa';
     const resourceType=isVid2?'video':'image';
-    const r=await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,{method:'POST',body:fd});
-    const d=await r.json();
+    // Usa XHR em vez de fetch para suportar arquivos grandes sem timeout
+    const d=await new Promise((resolve,reject)=>{
+      const xhr=new XMLHttpRequest();
+      xhr.open('POST',`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`);
+      xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);showToast(`Enviando... ${pct}%`);}};
+      xhr.onload=()=>{try{resolve(JSON.parse(xhr.responseText));}catch(e){reject(new Error('Resposta inválida'));}};
+      xhr.onerror=()=>reject(new Error('Erro de conexão'));
+      xhr.timeout=300000; // 5 minutos
+      xhr.ontimeout=()=>reject(new Error('Timeout — vídeo muito grande'));
+      xhr.send(fd);
+    });
     if(d.error){showToast('Erro: '+d.error.message,true);return;}
-    // Força extensão .mp4 para vídeos (Cloudinary converte automaticamente)
     let uploadedUrl=d.secure_url;
     if(isVid2) uploadedUrl=uploadedUrl.replace(/\.[^.]+$/, '.mp4');
     const uploadedIsVideo=isVid2;
