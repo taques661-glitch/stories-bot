@@ -713,7 +713,7 @@ function mkCell(date,other){
   if(!other&&ss.length){
     const acts=document.createElement('div');acts.className='day-actions';
     const dup=document.createElement('button');dup.className='day-action-btn';dup.title='Duplicar para proxima semana';dup.textContent='D';
-    dup.onclick=e=>{e.stopPropagation();dupDay(dstr);};acts.appendChild(dup);cell.appendChild(acts);
+    dup.onclick=e=>{e.stopPropagation();openDupModal(dstr);};acts.appendChild(dup);cell.appendChild(acts);
   }
   // Thumbnails estilo pasta
   const thumbWrap=document.createElement('div');
@@ -1234,6 +1234,92 @@ function showToast(msg,type){
   t.className='toast'+(type==='success'?' success':type===true?' error':'');
   t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3500);
 }
+// MODAL DUPLICAR DIA
+let dupSrcDate=null,dupTargetDays=new Set(),dupCalDate=new Date();
+function openDupModal(dstr){
+  dupSrcDate=dstr;dupTargetDays=new Set();dupCalDate=new Date();
+  // Cria modal dinamicamente
+  let m=document.getElementById('modal-dup');
+  if(!m){
+    m=document.createElement('div');m.id='modal-dup';m.className='modal-overlay';
+    m.style.display='none';
+    m.innerHTML=`
+      <div class="modal" style="max-width:420px">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <div class="modal-title">📋 Duplicar dia</div>
+          <button class="modal-close" onclick="closeDupModal()">×</button>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Selecione os dias destino para copiar os stories</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <button class="month-btn" onclick="dupCalPrev()">‹</button>
+          <span class="month-label" id="dup-cal-label" style="font-size:11px"></span>
+          <button class="month-btn" onclick="dupCalNext()">›</button>
+        </div>
+        <div id="dup-cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
+        <div style="margin-top:8px;font-size:10px;color:var(--text3);font-family:Syne,sans-serif">
+          <span id="dup-days-count" style="color:var(--gold);font-weight:700">0 dias</span> selecionados
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" onclick="closeDupModal()">Cancelar</button>
+          <button class="btn-save" id="btn-dup-save" onclick="confirmDup()" style="opacity:0.4;cursor:not-allowed" disabled>Duplicar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    m.onclick=e=>{if(e.target.id==='modal-dup')closeDupModal();};
+  }
+  m.style.display='flex';
+  renderDupCal();
+}
+function closeDupModal(){
+  const m=document.getElementById('modal-dup');
+  if(m)m.style.display='none';
+}
+function dupCalPrev(){dupCalDate.setMonth(dupCalDate.getMonth()-1);renderDupCal();}
+function dupCalNext(){dupCalDate.setMonth(dupCalDate.getMonth()+1);renderDupCal();}
+function renderDupCal(){
+  const y=dupCalDate.getFullYear(),m=dupCalDate.getMonth();
+  document.getElementById('dup-cal-label').textContent=MO[m]+' '+y;
+  const grid=document.getElementById('dup-cal-grid');grid.innerHTML='';
+  DY.forEach(d=>{const h=document.createElement('div');h.style.cssText='text-align:center;font-size:8px;color:var(--text3);font-family:Syne,sans-serif;padding:3px 0;font-weight:700';h.textContent=d;grid.appendChild(h);});
+  const fd=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),dip=new Date(y,m,0).getDate();
+  const todayStr=ds(new Date());
+  const addDay=(date,other)=>{
+    const dstr=ds(date);
+    const isPast=dstr<=dupSrcDate;
+    const el=document.createElement('div');
+    el.className='bulk-cal-day'+(other?' other':'')+(isPast?' past':'')+(dstr===todayStr?' today':'')+(dupTargetDays.has(dstr)?' selected':'');
+    el.textContent=date.getDate();
+    if(!other&&!isPast)el.onclick=()=>{
+      if(dupTargetDays.has(dstr))dupTargetDays.delete(dstr);
+      else dupTargetDays.add(dstr);
+      renderDupCal();
+      const nd=dupTargetDays.size;
+      document.getElementById('dup-days-count').textContent=nd+' dia'+(nd!==1?'s':'');
+      const btn=document.getElementById('btn-dup-save');
+      btn.disabled=nd===0;btn.style.opacity=nd>0?'1':'0.4';btn.style.cursor=nd>0?'pointer':'not-allowed';
+    };
+    grid.appendChild(el);
+  };
+  for(let i=0;i<fd;i++)addDay(new Date(y,m-1,dip-fd+i+1),true);
+  for(let d=1;d<=dim;d++)addDay(new Date(y,m,d),false);
+  const rem=42-fd-dim;for(let d=1;d<=rem;d++)addDay(new Date(y,m+1,d),true);
+}
+async function confirmDup(){
+  const ss=S.filter(s=>s.date===dupSrcDate);
+  if(!ss.length){showToast('Nenhum story no dia selecionado',true);return;}
+  let count=0;
+  for(const targetDate of dupTargetDays){
+    for(const s of ss){
+      const ns={...s,id:Date.now()+Math.random()*9999,date:targetDate,status:'scheduled'};
+      await sbSave(ns);count++;
+    }
+  }
+  closeDupModal();
+  await loadStories();
+  showToast(count+' story(s) duplicado(s) para '+dupTargetDays.size+' dia(s)!','success');
+}
+
 // Sincroniza status a cada 30s para refletir publicados/falhos do servidor
 setInterval(()=>loadStories(true), 30000);
 render();stats();loadStories();
