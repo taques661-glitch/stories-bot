@@ -277,14 +277,21 @@ setInterval(async () => {
     const now = new Date();
     const dateStr = now.toISOString().split("T")[0];
     const timeStr = now.toTimeString().substring(0, 5);
-    // Verifica também os 3 minutos anteriores para cobrir atraso do servidor ao acordar
+    // Verifica os últimos 3 minutos para cobrir atraso do servidor ao acordar
     const times = [];
     for(let i = 0; i <= 3; i++) {
       const t = new Date(now - i * 60000);
       times.push(t.toTimeString().substring(0, 5));
     }
-    const timeFilter = times.map(t => `time=eq.${t}`).join(',');
-    const rows = await sbGet(`status=eq.scheduled&date=eq.${dateStr}&or=(${timeFilter})`);
+    // Busca cada minuto separadamente e combina
+    const allRows = [];
+    for(const t of times) {
+      const r = await sbGet(`status=eq.scheduled&date=eq.${dateStr}&time=eq.${t}`);
+      allRows.push(...r);
+    }
+    // Remove duplicatas por id
+    const seen = new Set();
+    const rows = allRows.filter(r => { if(seen.has(r.id)) return false; seen.add(r.id); return true; });
 
     for (const row of rows) {
       if (!row.url || row.url.includes("[arquivo")) continue;
