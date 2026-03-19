@@ -257,6 +257,62 @@ app.post("/stories/publish", upload.single("file"), async (req, res) => {
 
 // Cleanup removido — status 'publishing' não suportado pelo Supabase
 
+// ROTA chamada pelo cron-job.org a cada minuto — acorda o servidor E publica
+app.get("/publish-due", async (req, res) => {
+  res.sendStatus(200); // responde imediatamente para não dar timeout
+  try {
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0];
+    const times = [];
+    for(let i = 0; i <= 3; i++) {
+      const t = new Date(now - i * 60000);
+      times.push(t.toTimeString().substring(0, 5));
+    }
+    const allRows = [];
+    for(const t of times) {
+      const r = await sbGet(`status=eq.scheduled&date=eq.${dateStr}&time=eq.${t}`);
+      allRows.push(...r);
+    }
+    const seen = new Set();
+    const rows = allRows.filter(r => { if(seen.has(r.id)) return false; seen.add(r.id); return true; });
+    console.log(`[publish-due] ${rows.length} stories para publicar`);
+    for (const row of rows) {
+      if (!row.url || row.url.includes("[arquivo")) continue;
+      await sbUpdate(row.id, { status: "publishing" });
+      try {
+        const isVideo = row.media_type === "VIDEO";
+        let mediaUrl = cleanCloudinaryUrl(row.url);
+        if(isVideo && mediaUrl.includes('cloudinary.com') && !mediaUrl.endsWith('.mp4')){
+          mediaUrl = mediaUrl.replace(/\.[^.]+$/, '.mp4');
+        }
+        console.log(`[publish-due] Publicando ${row.id} — ${isVideo ? 'VÍDEO' : 'IMAGEM'}`);
+        const containerRes = await axios.post(
+          `https://graph.facebook.com/v19.0/${row.ig_id || IG_ID}/media`,
+          { [isVideo ? "video_url" : "image_url"]: mediaUrl, media_type: "STORIES", access_token: IG_TOKEN }
+        );
+        const containerId = containerRes.data.id;
+        if (isVideo) {
+          await waitForVideo(containerId, IG_TOKEN);
+        } else {
+          await sleep(3000);
+        }
+        await axios.post(
+          `https://graph.facebook.com/v19.0/${row.ig_id || IG_ID}/media_publish`,
+          { creation_id: containerId, access_token: IG_TOKEN }
+        );
+        await sbUpdate(row.id, { status: "published" });
+        console.log(`[publish-due] Story ${row.id} publicado!`);
+      } catch (e) {
+        const errMsg = e.response?.data?.error?.message || e.message;
+        console.error(`[publish-due] Falha story ${row.id}:`, errMsg);
+        await sbUpdate(row.id, { status: "error" });
+      }
+    }
+  } catch(e) {
+    console.error("[publish-due] Erro:", e.message);
+  }
+});
+
 // CRON - publish scheduled stories (servidor)
 setInterval(async () => {
   try {
