@@ -255,21 +255,7 @@ app.post("/stories/publish", upload.single("file"), async (req, res) => {
   }
 });
 
-// CRON - limpa stories travados em 'publishing' há mais de 10 min
-setInterval(async () => {
-  try {
-    const rows = await sbGet("status=eq.publishing");
-    const now = Date.now();
-    for (const row of rows) {
-      // Se está em publishing mas o horário já passou há mais de 10 min, marca como error
-      const scheduledTime = new Date(row.date + 'T' + row.time + ':00').getTime();
-      if (now - scheduledTime > 10 * 60 * 1000) {
-        await sbUpdate(row.id, { status: "error" });
-        console.log(`[Cleanup] Story ${row.id} travado em publishing — marcado como error`);
-      }
-    }
-  } catch(e) { console.error("Cleanup error:", e.message, e.response?.data); }
-}, 5 * 60 * 1000); // a cada 5 minutos
+// Cleanup removido — status 'publishing' não suportado pelo Supabase
 
 // CRON - publish scheduled stories (servidor)
 setInterval(async () => {
@@ -296,8 +282,8 @@ setInterval(async () => {
     for (const row of rows) {
       if (!row.url || row.url.includes("[arquivo")) continue;
 
-      // FIX: marca como 'publishing' para evitar dupla publicação pelo frontend
-      await sbUpdate(row.id, { status: "publishing" });
+      // Marca como error temporariamente para evitar dupla publicação
+      await sbUpdate(row.id, { status: "error" });
 
       try {
         const isVideo = row.media_type === "VIDEO";
