@@ -1449,7 +1449,11 @@ async function confirmDup(){
 }
 
 // Sincroniza status a cada 30s para refletir publicados/falhos do servidor
-setInterval(()=>loadStories(true), 30000);
+setInterval(()=>{
+  const modals=['modal','modal-publish','modal-bulk','modal-dup','modal-dup-story'];
+  const anyOpen=modals.some(id=>{const m=document.getElementById(id);return m&&m.style.display!=='none';});
+  if(!anyOpen)loadStories(true);
+}, 30000);
 render();stats();loadStories();
 // Verifica status do token
 fetch(API+'/token-status').then(r=>r.json()).then(d=>{
