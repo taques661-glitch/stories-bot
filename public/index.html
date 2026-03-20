@@ -671,6 +671,7 @@ function switchNav(v){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('nav-'+v).classList.add('active');
   closeSidebar();
+  localStorage.setItem('tfx_view',v);
   const isCal=v==='month'||v==='week';
   document.getElementById('cal-tabs').style.display=isCal?'flex':'none';
   document.getElementById('month-nav').style.display=isCal?'flex':'none';
@@ -1457,7 +1458,10 @@ setInterval(()=>{
   const anyOpen=modals.some(id=>{const m=document.getElementById(id);return m&&m.style.display!=='none';});
   if(!anyOpen)loadStories(true);
 }, 120000);
-render();stats();loadStories();
+// Restaura última view ao iniciar
+const savedView=localStorage.getItem('tfx_view');
+if(savedView){switchNav(savedView);}else{render();}
+stats();loadStories();
 // Verifica status do token
 fetch(API+'/token-status').then(r=>r.json()).then(d=>{
   if(d.daysLeft<=7){
