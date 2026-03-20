@@ -505,7 +505,10 @@ async function loadStories(silent=false){
     const prev=S;
     S=d.stories||[];
     stats();
-    if(activeFilter!==null)renderList(activeFilter);else render();
+    // Mantém a view atual em vez de voltar para o início
+    if(activeFilter!==null)renderList(activeFilter);
+    else if(view==='week')renderWeek();
+    else renderMonth();
     if(!silent)document.getElementById('toast').classList.remove('show');
     // Notifica falhas novas
     if(silent){
