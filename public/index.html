@@ -1037,13 +1037,13 @@ async function saveStory(){
     if(i>=0){S[i]={...S[i],url:fu,date,time,caption,repeat,mediaType:mt,link};await sbSave(S[i]);}
     showToast('Story atualizado','success');
   } else {
-    const mk=(d,id)=>({id,url:fu,date:d,time,caption,repeat,status:'scheduled',mediaType:mt,link,ig_id:IG_ID});
-    const all=[mk(date,Date.now())];
-    if(repeat==='daily')for(let i=1;i<=6;i++)all.push(mk(addDays(date,i),Date.now()+i));
-    else if(repeat==='weekly')for(let i=1;i<=3;i++)all.push(mk(addDays(date,7*i),Date.now()+i*100));
-    else if(repeat==='weekdays'){let c=0,i=1;while(c<4){const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+i);if(d.getDay()!==0&&d.getDay()!==6){all.push(mk(ds(d),Date.now()+i*10));c++;}i++;}}
-    else if(repeat==='monthly')for(let i=1;i<=3;i++){const d=new Date(date+'T12:00:00');d.setMonth(d.getMonth()+i);all.push(mk(ds(d),Date.now()+i*1000));}
-    for(const s of all){if(s.url&&!s.url.includes('[arquivo')){await sbSave(s);}}
+    const mk=(d)=>({id:Date.now()+Math.floor(Math.random()*999999),url:fu,date:d,time,caption,repeat,status:'scheduled',mediaType:mt,link,ig_id:IG_ID});
+    const all=[mk(date)];
+    if(repeat==='daily')for(let i=1;i<=6;i++){await new Promise(r=>setTimeout(r,10));all.push(mk(addDays(date,i)));}
+    else if(repeat==='weekly')for(let i=1;i<=3;i++){await new Promise(r=>setTimeout(r,10));all.push(mk(addDays(date,7*i)));}
+    else if(repeat==='weekdays'){let c=0,i=1;while(c<4){const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+i);if(d.getDay()!==0&&d.getDay()!==6){await new Promise(r=>setTimeout(r,10));all.push(mk(ds(d)));c++;}i++;}}
+    else if(repeat==='monthly')for(let i=1;i<=3;i++){const d=new Date(date+'T12:00:00');d.setMonth(d.getMonth()+i);await new Promise(r=>setTimeout(r,10));all.push(mk(ds(d)));}
+    for(const s of all){await sbSave(s);}
     showToast(all.length>1?all.length+' stories agendados!':'Story agendado!','success');
     await loadStories();
   }
@@ -1269,19 +1269,89 @@ function showToast(msg,type){
   t.className='toast'+(type==='success'?' success':type===true?' error':'');
   t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3500);
 }
-// DUPLICAR STORY INDIVIDUAL
-async function dupStory(s){
-  const newDate=prompt('Data para o duplicado (YYYY-MM-DD):',s.date);
-  if(!newDate)return;
-  const newTime=prompt('Horário (HH:MM):',s.time);
-  if(!newTime)return;
-  const ns={id:Date.now()+Math.floor(Math.random()*999999),url:s.url,date:newDate,time:newTime,caption:s.caption||'',repeat:'none',status:'scheduled',mediaType:s.mediaType,link:s.link||'',ig_id:s.ig_id||IG_ID};
-  try{
-    const r=await fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ns)});
-    const d=await r.json();
-    if(d.success){await loadStories();showToast('Story duplicado!','success');}
-    else showToast('Erro ao duplicar',true);
-  }catch(e){showToast('Erro: '+e.message,true);}
+// DUPLICAR STORY INDIVIDUAL — abre calendário
+let dupStorySrc=null,dupStoryDays=new Set(),dupStoryCalDate=new Date();
+function dupStory(s){
+  dupStorySrc=s;dupStoryDays=new Set();dupStoryCalDate=new Date();
+  let m=document.getElementById('modal-dup-story');
+  if(!m){
+    m=document.createElement('div');m.id='modal-dup-story';m.className='modal-overlay';m.style.display='none';
+    m.innerHTML=`<div class="modal" style="max-width:420px">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title">⧉ Duplicar Story</div>
+        <button class="modal-close" onclick="closeDupStoryModal()">×</button>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Selecione os dias para duplicar este story</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <button class="month-btn" onclick="dupStoryCalPrev()">‹</button>
+        <span class="month-label" id="dup-story-cal-label" style="font-size:11px"></span>
+        <button class="month-btn" onclick="dupStoryCalNext()">›</button>
+      </div>
+      <div id="dup-story-cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
+      <div style="margin-top:8px">
+        <label class="form-label">Horário</label>
+        <input type="time" class="form-input" id="dup-story-time" style="width:120px">
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text3);font-family:Syne,sans-serif">
+        <span id="dup-story-days-count" style="color:var(--gold);font-weight:700">0 dias</span> selecionados
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeDupStoryModal()">Cancelar</button>
+        <button class="btn-save" id="btn-dup-story-save" onclick="confirmDupStory()" style="opacity:0.4;cursor:not-allowed" disabled>Duplicar</button>
+      </div>
+    </div>`;
+    document.body.appendChild(m);
+    m.onclick=e=>{if(e.target.id==='modal-dup-story')closeDupStoryModal();};
+  }
+  document.getElementById('dup-story-time').value=s.time;
+  m.style.display='flex';
+  renderDupStoryCal();
+}
+function closeDupStoryModal(){const m=document.getElementById('modal-dup-story');if(m)m.style.display='none';}
+function dupStoryCalPrev(){dupStoryCalDate.setMonth(dupStoryCalDate.getMonth()-1);renderDupStoryCal();}
+function dupStoryCalNext(){dupStoryCalDate.setMonth(dupStoryCalDate.getMonth()+1);renderDupStoryCal();}
+function renderDupStoryCal(){
+  const y=dupStoryCalDate.getFullYear(),m=dupStoryCalDate.getMonth();
+  document.getElementById('dup-story-cal-label').textContent=MO[m]+' '+y;
+  const grid=document.getElementById('dup-story-cal-grid');grid.innerHTML='';
+  DY.forEach(d=>{const h=document.createElement('div');h.style.cssText='text-align:center;font-size:8px;color:var(--text3);font-family:Syne,sans-serif;padding:3px 0;font-weight:700';h.textContent=d;grid.appendChild(h);});
+  const fd=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),dip=new Date(y,m,0).getDate();
+  const todayStr=ds(new Date());
+  const addDay=(date,other)=>{
+    const dstr=ds(date);
+    const isPast=dstr<todayStr;
+    const el=document.createElement('div');
+    el.className='bulk-cal-day'+(other?' other':'')+(isPast?' past':'')+(dstr===todayStr?' today':'')+(dupStoryDays.has(dstr)?' selected':'');
+    el.textContent=date.getDate();
+    if(!other&&!isPast)el.onclick=()=>{
+      if(dupStoryDays.has(dstr))dupStoryDays.delete(dstr);
+      else dupStoryDays.add(dstr);
+      renderDupStoryCal();
+      const nd=dupStoryDays.size;
+      document.getElementById('dup-story-days-count').textContent=nd+' dia'+(nd!==1?'s':'');
+      const btn=document.getElementById('btn-dup-story-save');
+      btn.disabled=nd===0;btn.style.opacity=nd>0?'1':'0.4';btn.style.cursor=nd>0?'pointer':'not-allowed';
+    };
+    grid.appendChild(el);
+  };
+  for(let i=0;i<fd;i++)addDay(new Date(y,m-1,dip-fd+i+1),true);
+  for(let d=1;d<=dim;d++)addDay(new Date(y,m,d),false);
+  const rem=42-fd-dim;for(let d=1;d<=rem;d++)addDay(new Date(y,m+1,d),true);
+}
+async function confirmDupStory(){
+  if(!dupStorySrc||!dupStoryDays.size)return;
+  const newTime=document.getElementById('dup-story-time').value||dupStorySrc.time;
+  let count=0;
+  for(const targetDate of [...dupStoryDays]){
+    const ns={id:Date.now()+Math.floor(Math.random()*999999),url:dupStorySrc.url,date:targetDate,time:newTime,caption:dupStorySrc.caption||'',repeat:'none',status:'scheduled',mediaType:dupStorySrc.mediaType,link:dupStorySrc.link||'',ig_id:dupStorySrc.ig_id||IG_ID};
+    await fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ns)});
+    count++;
+    await new Promise(r=>setTimeout(r,50));
+  }
+  closeDupStoryModal();
+  await loadStories();
+  showToast(count+' cópia(s) agendada(s)!','success');
 }
 
 // MODAL DUPLICAR DIA
