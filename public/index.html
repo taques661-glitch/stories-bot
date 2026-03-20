@@ -588,7 +588,7 @@ async function handleFileSelect(e){
   setPhone(document.getElementById('pv-img'),document.getElementById('pv-video'),document.getElementById('pv-empty'),url,isVid);
   // Aviso para vídeos grandes no celular
   const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if(isMobile && f.size > 50*1024*1024){
+  if(isMobile && f.size > 100*1024*1024){
     showToast('Vídeos acima de 50MB: use o computador para enviar!',true);
     return;
   }
