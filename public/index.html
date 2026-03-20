@@ -1180,8 +1180,8 @@ async function saveBulkStories(){
     s.textContent=(i+1)+'. '+dd.getDate()+'/'+String(dd.getMonth()+1).padStart(2,'0')+' '+f.time;
     stepsEl.appendChild(s);return s;
   });
-  let ok=0,fail=0;
-  for(let i=0;i<bulkFiles.length;i++){
+  // Upload em paralelo — 2 por vez para não sobrecarregar
+  const uploadOne = async (i) => {
     const bf=bulkFiles[i];
     stepEls[i].className='progress-step uploading';
     let mediaUrl=bf.url,mediaType=bf.type&&bf.type.includes('video')?'VIDEO':'IMAGE';
@@ -1198,22 +1198,32 @@ async function saveBulkStories(){
         const d=await new Promise((resolve,reject)=>{
           const xhr=new XMLHttpRequest();
           xhr.open('POST',`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`);
-          xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);stepEls[i].textContent=stepEls[i].textContent.split(' ')[0]+' '+pct+'%';}};
+          xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);stepEls[i].textContent=(i+1)+'. '+pct+'%';}};
           xhr.onload=()=>{try{resolve(JSON.parse(xhr.responseText));}catch(e){reject(new Error('Resposta inválida'));}};
           xhr.onerror=()=>reject(new Error('Erro de conexão'));
-          xhr.timeout=300000;
-          xhr.ontimeout=()=>reject(new Error('Timeout'));
+          xhr.timeout=600000; // 10 minutos
+          xhr.ontimeout=()=>reject(new Error('Timeout — vídeo muito grande'));
           xhr.send(fd);
         });
         if(d.error) throw new Error(d.error.message);
         mediaUrl=d.secure_url;
         if(isVid2) mediaUrl=mediaUrl.replace(/\.[^.]+$/, '.mp4');
         mediaType=isVid2?'VIDEO':'IMAGE';
-      }catch(e){stepEls[i].className='progress-step fail';stepEls[i].title=e.message;fail++;continue;}
+      }catch(e){stepEls[i].className='progress-step fail';stepEls[i].title=e.message;return null;}
     }
-    const story={id:Date.now()+i*7,url:mediaUrl,date:bf.assignedDay||ds(new Date()),time:bf.time||'09:00',caption,repeat:'none',status:'scheduled',mediaType,link:'',ig_id:IG_ID};
+    const story={id:Date.now()+i*7+Math.floor(Math.random()*999),url:mediaUrl,date:bf.assignedDay||ds(new Date()),time:bf.time||'09:00',caption,repeat:'none',status:'scheduled',mediaType,link:'',ig_id:IG_ID};
     await sbSave(story);
-    stepEls[i].className='progress-step done';ok++;
+    stepEls[i].className='progress-step done';
+    return story;
+  };
+
+  // Processa em lotes de 2
+  let ok=0,fail=0;
+  for(let i=0;i<bulkFiles.length;i+=2){
+    const batch=[uploadOne(i)];
+    if(i+1<bulkFiles.length) batch.push(uploadOne(i+1));
+    const results=await Promise.all(batch);
+    results.forEach(r=>{if(r)ok++;else fail++;});
   }
   await loadStories();
   showToast(ok+' stories agendados'+(fail?' ('+fail+' erros)':'')+'!','success');
