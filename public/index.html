@@ -756,7 +756,9 @@ function mkCell(date,other){
     eb.onclick=e=>{e.stopPropagation();openEdit(s);};
     const db=document.createElement('button');db.style.cssText='width:14px;height:14px;border-radius:2px;background:rgba(248,113,113,0.9);border:none;font-size:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white';db.textContent='✕';
     db.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();render();}};
-    acts.appendChild(eb);acts.appendChild(db);
+    const cpb=document.createElement('button');cpb.style.cssText='width:14px;height:14px;border-radius:2px;background:rgba(74,222,128,0.8);border:none;font-size:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#000';cpb.textContent='⧉';cpb.title='Duplicar';
+    cpb.onclick=e=>{e.stopPropagation();dupStory(s);};
+    acts.appendChild(eb);acts.appendChild(cpb);acts.appendChild(db);
     if(s.status==='error'){
       const rb=document.createElement('button');
       rb.style.cssText='width:14px;height:14px;border-radius:2px;background:rgba(232,200,74,0.9);border:none;font-size:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#000';
@@ -864,7 +866,9 @@ function renderWeek(){
       eb.onclick=e=>{e.stopPropagation();openEdit(s);};
       const db=document.createElement('button');db.style.cssText='width:16px;height:16px;border-radius:2px;background:rgba(248,113,113,0.9);border:none;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white';db.textContent='✕';
       db.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();render();}};
-      acts.appendChild(eb);acts.appendChild(db);t.appendChild(acts);
+      const cpb=document.createElement('button');cpb.style.cssText='width:16px;height:16px;border-radius:2px;background:rgba(74,222,128,0.8);border:none;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#000';cpb.textContent='⧉';cpb.title='Duplicar';
+      cpb.onclick=e=>{e.stopPropagation();dupStory(s);};
+      acts.appendChild(eb);acts.appendChild(cpb);acts.appendChild(db);t.appendChild(acts);
       t.addEventListener('mouseenter',()=>acts.style.display='flex');
       t.addEventListener('mouseleave',()=>acts.style.display='none');
       t.onclick=e=>{if(e.target===t||e.target.tagName==='VIDEO'||e.target.tagName==='IMG')openEdit(s);};
@@ -947,8 +951,9 @@ function renderList(filter){
       st.textContent={scheduled:'AGENDADO',publishing:'PUBLICANDO...',published:'PUBLICADO',error:'FALHOU',pending:'PENDENTE'}[s.status]||s.status.toUpperCase();
       const acts=document.createElement('div');acts.className='list-actions';
       const editBtn=document.createElement('button');editBtn.className='list-btn';editBtn.textContent='Editar';editBtn.onclick=e=>{e.stopPropagation();openEdit(s);};
+      const dupBtn=document.createElement('button');dupBtn.className='list-btn';dupBtn.textContent='⧉';dupBtn.title='Duplicar';dupBtn.onclick=e=>{e.stopPropagation();dupStory(s);};
       const delBtn=document.createElement('button');delBtn.className='list-btn del';delBtn.textContent='✕';delBtn.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();renderList(filter);}};
-      acts.appendChild(editBtn);acts.appendChild(delBtn);
+      acts.appendChild(editBtn);acts.appendChild(dupBtn);acts.appendChild(delBtn);
       item.appendChild(cb);item.appendChild(thumb);item.appendChild(info);item.appendChild(st);item.appendChild(acts);
       item.onclick=()=>openEdit(s);
       sec.appendChild(item);
@@ -1264,6 +1269,21 @@ function showToast(msg,type){
   t.className='toast'+(type==='success'?' success':type===true?' error':'');
   t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3500);
 }
+// DUPLICAR STORY INDIVIDUAL
+async function dupStory(s){
+  const newDate=prompt('Data para o duplicado (YYYY-MM-DD):',s.date);
+  if(!newDate)return;
+  const newTime=prompt('Horário (HH:MM):',s.time);
+  if(!newTime)return;
+  const ns={id:Date.now()+Math.floor(Math.random()*999999),url:s.url,date:newDate,time:newTime,caption:s.caption||'',repeat:'none',status:'scheduled',mediaType:s.mediaType,link:s.link||'',ig_id:s.ig_id||IG_ID};
+  try{
+    const r=await fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ns)});
+    const d=await r.json();
+    if(d.success){await loadStories();showToast('Story duplicado!','success');}
+    else showToast('Erro ao duplicar',true);
+  }catch(e){showToast('Erro: '+e.message,true);}
+}
+
 // MODAL DUPLICAR DIA
 let dupSrcDate=null,dupTargetDays=new Set(),dupCalDate=new Date();
 function openDupModal(dstr){
