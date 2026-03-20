@@ -1453,7 +1453,7 @@ setInterval(()=>{
   const modals=['modal','modal-publish','modal-bulk','modal-dup','modal-dup-story'];
   const anyOpen=modals.some(id=>{const m=document.getElementById(id);return m&&m.style.display!=='none';});
   if(!anyOpen)loadStories(true);
-}, 30000);
+}, 120000);
 render();stats();loadStories();
 // Verifica status do token
 fetch(API+'/token-status').then(r=>r.json()).then(d=>{
