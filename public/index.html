@@ -816,8 +816,8 @@ function renderWeek(){
       if(!story||story.date===dstr)return;
       const newTime=prompt('Horário no novo dia (HH:MM):',story.time);
       if(!newTime)return;
-      story.date=dstr;story.time=newTime;
-      await sbPatch(storyId,{date:dstr,time:newTime});
+      story.date=dstr;story.time=newTime;story.status='scheduled';
+      await sbPatch(storyId,{date:dstr,time:newTime,status:'scheduled'});
       sv();render();showToast('Story movido para '+dstr+'!','success');
     });
 
