@@ -1341,6 +1341,9 @@ function renderDupStoryCal(){
 }
 async function confirmDupStory(){
   if(!dupStorySrc||!dupStoryDays.size)return;
+  const btn=document.getElementById('btn-dup-story-save');
+  if(btn.disabled)return;
+  btn.disabled=true;btn.style.opacity='0.5';
   const newTime=document.getElementById('dup-story-time').value||dupStorySrc.time;
   let count=0;
   for(const targetDate of [...dupStoryDays]){
