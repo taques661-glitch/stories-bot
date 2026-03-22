@@ -578,7 +578,11 @@ function setPhone(img,vid,empty,src,isVid){
 function updatePreview(){const u=document.getElementById('input-url').value;setPhone(document.getElementById('pv-img'),document.getElementById('pv-video'),document.getElementById('pv-empty'),u&&u.startsWith('http')?u:null,u.toLowerCase().includes('.mp4'));}
 function updatePublishPreview(){const u=document.getElementById('pnow-url').value;setPhone(document.getElementById('pnow-frame-img'),document.getElementById('pnow-frame-video'),document.getElementById('pnow-empty'),u&&u.startsWith('http')?u:null,u.toLowerCase().includes('.mp4'));}
 async function handleFileSelect(e){
-  const f=e.target.files[0];if(!f)return;selFile=f;
+  const f=e.target.files[0];if(!f)return;
+  await checkFps(f,'modal',(file)=>_doHandleFileSelect(file));
+}
+async function _doHandleFileSelect(f){
+  selFile=f;
   document.getElementById('upload-content').style.display='none';
   const badge=document.getElementById('upload-badge');badge.style.display='block';badge.textContent=f.type.includes('video')?'VIDEO':'IMG';
   document.getElementById('upload-area').classList.add('has-file');
@@ -639,6 +643,9 @@ async function handleFileSelect(e){
 }
 async function handlePublishFileSelect(e){
   const f=e.target.files[0];if(!f)return;
+  await checkFps(f,'publish',(file)=>_doHandlePublishFileSelect(file));
+}
+async function _doHandlePublishFileSelect(f){
   document.getElementById('pnow-upload-content').style.display='none';
   const badge=document.getElementById('pnow-badge');badge.style.display='block';badge.textContent=f.type.includes('video')?'VIDEO':'IMG';
   const localUrl=URL.createObjectURL(f);const isVid=f.type.includes('video');
@@ -1472,6 +1479,101 @@ fetch(API+'/token-status').then(r=>r.json()).then(d=>{
 if(typeof Notification!=='undefined'&&Notification.permission==='default'){
   Notification.requestPermission();
 }
+
+// ── FPS CHECK ──────────────────────────────────────────────────────────────
+let _pendingFpsFile=null,_pendingFpsContext=null,_pendingFpsOnOk=null;
+function copyFpsCmd(){
+  const cmd=document.getElementById('fps-cmd').textContent;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(cmd).then(()=>{_fpsBtn('COPIADO ✓');}).catch(()=>_fpsCopy(cmd));
+  } else {_fpsCopy(cmd);}
+}
+function _fpsCopy(cmd){
+  const ta=document.createElement('textarea');ta.value=cmd;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');document.body.removeChild(ta);_fpsBtn('COPIADO ✓');
+}
+function _fpsBtn(txt){
+  const btn=document.getElementById('copy-fps-btn');if(!btn)return;
+  btn.textContent=txt;setTimeout(()=>btn.textContent='COPIAR',2000);
+}
+function continuarUploadMesmoAssim(){
+  if(_pendingFpsOnOk&&_pendingFpsFile)_pendingFpsOnOk(_pendingFpsFile);
+  _pendingFpsFile=null;_pendingFpsContext=null;_pendingFpsOnOk=null;
+}
+async function checkFps(file,context,onOk){
+  if(!file.type.includes('video')){onOk(file);return;}
+  _pendingFpsFile=file;_pendingFpsContext=context;_pendingFpsOnOk=onOk;
+  try{
+    const url=URL.createObjectURL(file);
+    const video=document.createElement('video');
+    video.src=url;video.muted=true;video.preload='metadata';video.playsInline=true;
+    await new Promise(r=>{video.onloadedmetadata=r;video.onerror=r;setTimeout(r,4000);});
+    let fps=null;
+    if('requestVideoFrameCallback' in video){
+      const seekTo=Math.min(2,video.duration||2);
+      video.currentTime=seekTo;
+      await new Promise(r=>{video.onseeked=r;setTimeout(r,1500);});
+      let frames=0,startTime=null;
+      fps=await new Promise(resolve=>{
+        const cb=(now,meta)=>{
+          if(startTime===null)startTime=meta.mediaTime;
+          frames++;
+          const elapsed=meta.mediaTime-startTime;
+          if(elapsed<1.0&&frames<150){video.requestVideoFrameCallback(cb);}
+          else{resolve(elapsed>0.05?Math.round(frames/elapsed):null);}
+        };
+        video.requestVideoFrameCallback(cb);
+        video.play().catch(()=>{});
+        setTimeout(()=>resolve(null),3500);
+      });
+      video.pause();
+    }
+    URL.revokeObjectURL(url);
+    if(fps&&fps>31){
+      const lines=[
+        'ffmpeg -i ~/Downloads/'+file.name+' \\',
+        '  -vf "fps=30" \\',
+        '  -c:v libx264 -crf 23 -preset fast \\',
+        '  -c:a aac -b:a 128k \\',
+        '  -movflags +faststart \\',
+        '  ~/Downloads/story_corrigido.mp4'
+      ];
+      document.getElementById('fps-detected').textContent=fps+' fps';
+      document.getElementById('fps-cmd').textContent=lines.join('\n');
+      document.getElementById('modal-fps').style.display='flex';
+    } else {
+      onOk(file);
+    }
+  }catch(e){console.warn('checkFps error:',e);onOk(file);}
+}
+// ── FIM FPS CHECK ───────────────────────────────────────────────────────────
+
 </script>
+
+<!-- MODAL FPS ALTO -->
+<div class="modal-overlay" id="modal-fps" style="display:none" onclick="if(event.target.id==='modal-fps')document.getElementById('modal-fps').style.display='none'">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">⚠️ Vídeo com FPS alto</div>
+      <button class="modal-close" onclick="document.getElementById('modal-fps').style.display='none'">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:12px">
+      Este vídeo tem <strong id="fps-detected" style="color:var(--gold)">0 fps</strong> — o Instagram só aceita até <strong style="color:var(--green)">30 fps</strong>.<br><br>
+      Converta antes de fazer upload usando o comando abaixo no Terminal do Mac:
+    </div>
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;position:relative;margin-bottom:4px">
+      <pre id="fps-cmd" style="font-family:monospace;font-size:10px;color:var(--gold);white-space:pre-wrap;word-break:break-all;line-height:1.7;margin:0;padding-right:60px"></pre>
+      <button onclick="copyFpsCmd()" id="copy-fps-btn" style="position:absolute;top:8px;right:8px;padding:3px 8px;background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:4px;color:var(--gold);font-size:9px;font-family:'Syne',sans-serif;font-weight:700;cursor:pointer">COPIAR</button>
+    </div>
+    <div style="margin-top:6px;font-size:10px;color:var(--text3)">
+      O arquivo convertido ficará em <code style="color:var(--gold)">~/Downloads/story_corrigido.mp4</code>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('modal-fps').style.display='none'">Fechar</button>
+      <button class="btn-save" onclick="document.getElementById('modal-fps').style.display='none';continuarUploadMesmoAssim()" style="background:var(--red-dim);color:var(--red);border:1px solid rgba(248,113,113,0.2)">Enviar mesmo assim</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
