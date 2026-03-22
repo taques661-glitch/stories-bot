@@ -540,13 +540,13 @@ async function sbSave(story){
   try{await fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(story)});}
   catch(e){console.warn('sbSave failed',e);}
 }
-async function sbPatch(id,fields){
-  try{await fetch(API+'/schedule/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)});}
-  catch(e){console.warn('sbPatch failed',e);}
+function sbPatch(id,fields){
+  // Fire-and-forget: não bloqueia a UI
+  fetch(API+'/schedule/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)}).catch(e=>console.warn('sbPatch failed',e));
 }
-async function sbDel(id){
-  try{await fetch(API+'/schedule/'+id,{method:'DELETE'});}
-  catch(e){console.warn('sbDel failed',e);}
+function sbDel(id){
+  // Fire-and-forget: não bloqueia a UI
+  fetch(API+'/schedule/'+id,{method:'DELETE'}).catch(e=>console.warn('sbDel failed',e));
 }
 function stats(){
   const sc=S.filter(s=>s.status==='scheduled'||s.status==='pending').length;
@@ -667,6 +667,7 @@ async function _doHandlePublishFileSelect(f){
     // Força extensão .mp4 para vídeos
     let uploadedUrl=d.secure_url;
     if(isVid) uploadedUrl=uploadedUrl.replace(/\.[^.]+$/, '.mp4');
+    if(isVid) uploadedUrl=fixVideoUrl(uploadedUrl);
     pubFile=null;
     document.getElementById('pnow-url').value=uploadedUrl;
     document.getElementById('pnow-section-url').style.display='block';
@@ -963,7 +964,7 @@ function renderList(filter){
       const acts=document.createElement('div');acts.className='list-actions';
       const editBtn=document.createElement('button');editBtn.className='list-btn';editBtn.textContent='Editar';editBtn.onclick=e=>{e.stopPropagation();openEdit(s);};
       const dupBtn=document.createElement('button');dupBtn.className='list-btn';dupBtn.textContent='⧉';dupBtn.title='Duplicar';dupBtn.onclick=e=>{e.stopPropagation();dupStory(s);};
-      const delBtn=document.createElement('button');delBtn.className='list-btn del';delBtn.textContent='✕';delBtn.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();renderList(filter);}};
+      const delBtn=document.createElement('button');delBtn.className='list-btn del';delBtn.textContent='✕';delBtn.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){item.style.opacity='0.3';item.style.pointerEvents='none';sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();renderList(filter);}};
       acts.appendChild(editBtn);acts.appendChild(dupBtn);acts.appendChild(delBtn);
       item.appendChild(cb);item.appendChild(thumb);item.appendChild(info);item.appendChild(st);item.appendChild(acts);
       item.onclick=()=>openEdit(s);
@@ -1040,6 +1041,7 @@ async function saveStory(){
       if(d.error) throw new Error(d.error.message);
       fu=d.secure_url;
       if(isVid2) fu=fu.replace(/\.[^.]+$/, '.mp4');
+      if(isVid2) fu=fixVideoUrl(fu);
       mt=isVid2?'VIDEO':'IMAGE';
     }catch(e){showToast('Erro no upload: '+e.message,true);return;}
   }
@@ -1224,6 +1226,7 @@ async function saveBulkStories(){
         if(d.error) throw new Error(d.error.message);
         mediaUrl=d.secure_url;
         if(isVid2) mediaUrl=mediaUrl.replace(/\.[^.]+$/, '.mp4');
+        if(isVid2) mediaUrl=fixVideoUrl(mediaUrl);
         mediaType=isVid2?'VIDEO':'IMAGE';
       }catch(e){stepEls[i].className='progress-step fail';stepEls[i].title=e.message;return null;}
     }
@@ -1464,7 +1467,7 @@ setInterval(()=>{
   const modals=['modal','modal-publish','modal-bulk','modal-dup','modal-dup-story'];
   const anyOpen=modals.some(id=>{const m=document.getElementById(id);return m&&m.style.display!=='none';});
   if(!anyOpen)loadStories(true);
-}, 120000);
+}, 180000); // 3 min — reduzido para aliviar carga
 // Restaura última view ao iniciar
 const savedView=localStorage.getItem('tfx_view');
 if(savedView){switchNav(savedView);}else{render();}
@@ -1479,6 +1482,17 @@ fetch(API+'/token-status').then(r=>r.json()).then(d=>{
 if(typeof Notification!=='undefined'&&Notification.permission==='default'){
   Notification.requestPermission();
 }
+
+
+// ── CLOUDINARY FPS FIX ──────────────────────────────────────────────────────
+function fixVideoUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+  if (!url.includes('res.cloudinary.com') || !url.includes('/video/upload/')) return url;
+  // Já tem transformação?
+  if (url.includes('fps_30') || url.includes('vc_h264')) return url;
+  return url.replace('/video/upload/', '/video/upload/vc_h264,fps_30,q_auto/');
+}
+// ── FIM CLOUDINARY FPS FIX ──────────────────────────────────────────────────
 
 // ── FPS CHECK ──────────────────────────────────────────────────────────────
 let _pendingFpsFile=null,_pendingFpsContext=null,_pendingFpsOnOk=null;
