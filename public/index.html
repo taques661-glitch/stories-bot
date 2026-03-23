@@ -209,6 +209,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 .toast.error{border-color:rgba(248,113,113,0.3);color:var(--red)}
 .toast.success{border-color:rgba(74,222,128,0.3);color:var(--green)}
+
+.skel{background:linear-gradient(90deg,var(--bg3) 25%,rgba(255,255,255,0.04) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel-cell{min-height:95px;border-radius:8px;border:1px solid var(--border)}
+@media(max-width:768px){.skel-cell{min-height:60px}}
+
 ::-webkit-scrollbar{width:3px}
 ::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
 @media(max-width:768px){
@@ -702,8 +708,8 @@ function switchNav(v){
   }
 }
 function switchTab(v){view=v;document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+v).classList.add('active');if(v==='month'){document.getElementById('nav-month').classList.add('active');document.getElementById('nav-week').classList.remove('active');}else{document.getElementById('nav-week').classList.add('active');document.getElementById('nav-month').classList.remove('active');}render();}
-function prevPeriod(){if(view==='month')cur.setMonth(cur.getMonth()-1);else cur.setDate(cur.getDate()-7);render();}
-function nextPeriod(){if(view==='month')cur.setMonth(cur.getMonth()+1);else cur.setDate(cur.getDate()+7);render();}
+function prevPeriod(){if(view==='month'){cur.setMonth(cur.getMonth()-1);renderSkeleton();loadStories(false);}else{cur.setDate(cur.getDate()-7);render();}}
+function nextPeriod(){if(view==='month'){cur.setMonth(cur.getMonth()+1);renderSkeleton();loadStories(false);}else{cur.setDate(cur.getDate()+7);render();}}
 function render(){if(view==='month')renderMonth();else renderWeek();}
 function ds(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function renderMonth(){
@@ -1475,6 +1481,50 @@ if(typeof Notification!=='undefined'&&Notification.permission==='default'){
 }
 
 
+
+
+// ── CACHE + PAGINAÇÃO + SKELETON ────────────────────────────────────────────
+const CACHE_KEY='tfx_cache_v1';
+const CACHE_TTL=90000; // 90s — usa cache se fresher que isso
+
+function saveCache(stories){
+  try{localStorage.setItem(CACHE_KEY,JSON.stringify({ts:Date.now(),data:stories}));}catch(e){}
+}
+function loadCache(){
+  try{
+    const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
+    if(c&&Date.now()-c.ts<CACHE_TTL)return c.data;
+  }catch(e){}
+  return null;
+}
+function clearCache(){try{localStorage.removeItem(CACHE_KEY);}catch(e){}}
+
+// Paginação: retorna range de datas para buscar (mês atual ± 2 meses)
+function getDateRange(){
+  const y=cur.getFullYear(),m=cur.getMonth();
+  const from=new Date(y,m-2,1);
+  const to=new Date(y,m+3,0);
+  const pad=n=>String(n).padStart(2,'0');
+  return {
+    from:`${from.getFullYear()}-${pad(from.getMonth()+1)}-01`,
+    to:`${to.getFullYear()}-${pad(to.getMonth()+1)}-${to.getDate()}`
+  };
+}
+
+function renderSkeleton(){
+  const c=document.getElementById('main-content');
+  if(!c||view!=='month')return;
+  c.innerHTML='';
+  const g=document.createElement('div');g.className='calendar-grid';
+  DY.forEach(d=>{const h=document.createElement('div');h.className='day-header';h.textContent=d;g.appendChild(h);});
+  for(let i=0;i<42;i++){
+    const cell=document.createElement('div');
+    cell.className='skel skel-cell';
+    g.appendChild(cell);
+  }
+  c.appendChild(g);
+}
+// ── FIM CACHE + PAGINAÇÃO + SKELETON ────────────────────────────────────────
 
 // ── LAZY VIDEO ──────────────────────────────────────────────────────────────
 const _lazyObs = new IntersectionObserver((entries)=>{
