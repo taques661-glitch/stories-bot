@@ -132,7 +132,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .bulk-assign-info{flex:1;min-width:0;font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bulk-assign-date{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--gold)}
 .bulk-assign-time{width:80px;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;font-family:inherit;outline:none}
-.bulk-assign-time:focus{border-color:var(--gold)}.bulk-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--gold-border);padding:12px 16px;display:flex;align-items:center;gap:10px;z-index:50;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1)}
+.bulk-assign-time:focus{border-color:var(--gold)}
+.bulk-progress-bar{width:100%;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin:8px 0;overflow:hidden;display:none}
+.bulk-progress-fill{height:100%;background:var(--gold);border-radius:2px;transition:width 0.3s}
+.bulk-progress-label{font-size:10px;color:var(--text3);font-family:'Syne',sans-serif;text-align:center;margin-bottom:4px;display:none}
+
+
+.media-filter-bar{display:flex;gap:4px;padding:6px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.media-chip{padding:3px 10px;border-radius:20px;font-size:10px;font-family:'Syne',sans-serif;font-weight:700;background:var(--bg3);border:1px solid var(--border);color:var(--text3);cursor:pointer;transition:all 0.15s}
+.media-chip.active{background:var(--gold-dim);border-color:var(--gold);color:var(--gold)}
+
+.bulk-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--gold-border);padding:12px 16px;display:flex;align-items:center;gap:10px;z-index:50;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1)}
 .bulk-bar.show{transform:translateY(0)}
 .bulk-count{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--gold)}
 .bulk-actions{display:flex;gap:6px;margin-left:auto}
@@ -310,6 +320,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       </div>
       <button class="btn-publish" onclick="openPublishNow()">&#9654; Publicar Agora</button>
     </div>
+    <div class="media-filter-bar" id="media-filter-bar" style="display:none">
+      <button class="media-chip active" id="mf-all" onclick="setMediaFilter('all')">Todos</button>
+      <button class="media-chip" id="mf-image" onclick="setMediaFilter('IMAGE')">🖼 Imagens</button>
+      <button class="media-chip" id="mf-video" onclick="setMediaFilter('VIDEO')">🎥 Vídeos</button>
+    </div>
     <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
       <div class="calendar-container" id="main-content"></div>
     </div>
@@ -477,6 +492,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <input type="text" class="form-input" id="bulk-caption" placeholder="Opcional...">
       </div>
 
+      <div class="bulk-progress-label" id="bulk-progress-label"></div>
+      <div class="bulk-progress-bar" id="bulk-progress-bar"><div class="bulk-progress-fill" id="bulk-progress-fill" style="width:0%"></div></div>
       <div class="progress-steps" id="bulk-progress-steps" style="display:none"></div>
 
       <div class="modal-actions">
@@ -702,6 +719,8 @@ function switchNav(v){
   const isCal=v==='month'||v==='week';
   document.getElementById('cal-tabs').style.display=isCal?'flex':'none';
   document.getElementById('month-nav').style.display=isCal?'flex':'none';
+  const mfBar=document.getElementById('media-filter-bar');
+  if(mfBar)mfBar.style.display=isCal?'none':'flex';
   if(isCal){
     view=v;activeFilter=null;
     document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));
@@ -738,7 +757,7 @@ function renderMonth(){
   c.appendChild(g);
 }
 function mkCell(date,other){
-  const cell=document.createElement('div'),dstr=ds(date),today=ds(new Date()),ss=S.filter(s=>s.date===dstr);
+  const cell=document.createElement('div'),dstr=ds(date),today=ds(new Date()),ss=S.filter(s=>s.date===dstr).sort((a,b)=>a.time.localeCompare(b.time));
   cell.className='day-cell'+(other?' other-month':'')+(dstr===today?' today':'')+(ss.length?' has-stories':'');
   const n=document.createElement('div');n.className='day-number';n.textContent=date.getDate();cell.appendChild(n);
   if(!other&&ss.length){
@@ -836,6 +855,7 @@ function renderWeek(){
   for(let d=0;d<7;d++){
     const date=new Date(st);date.setDate(date.getDate()+d);
     const dstr=ds(date),ss=S.filter(s=>s.date===dstr);
+    ss.sort((a,b)=>a.time.localeCompare(b.time));
     const col=document.createElement('div');col.className='week-col';col.style.cssText='border-left:1px solid var(--border);overflow-y:auto;min-height:200px';
     col.addEventListener('dragover',e=>{e.preventDefault();col.style.background='rgba(232,200,74,0.08)';});
     col.addEventListener('dragleave',()=>{col.style.background='';});
@@ -933,7 +953,8 @@ function bulkReschedule(){
 function renderList(filter){
   const c=document.getElementById('main-content');c.innerHTML='';
   const wrap=document.createElement('div');wrap.className='list-wrap';
-  const filtered=filter?S.filter(s=>s.status===filter||(filter==='scheduled'&&s.status==='pending')):[...S].sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  const base=filter?S.filter(s=>s.status===filter||(filter==='scheduled'&&s.status==='pending')):[...S].sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  const filtered=applyMediaFilter(base);
   if(!filtered.length){wrap.innerHTML='<div class="empty-state"><div class="empty-icon">&#128219;</div><div class="empty-text">Nenhum story encontrado</div></div>';c.appendChild(wrap);return;}
   // Select all row
   const selRow=document.createElement('div');selRow.className='select-all-row';
@@ -1201,6 +1222,11 @@ async function saveBulkStories(){
   const btn=document.getElementById('btn-bulk-save');btn.disabled=true;btn.style.opacity='0.6';
   const caption=document.getElementById('bulk-caption').value;
   const stepsEl=document.getElementById('bulk-progress-steps');stepsEl.style.display='flex';stepsEl.innerHTML='';
+  const barEl=document.getElementById('bulk-progress-bar');
+  const fillEl=document.getElementById('bulk-progress-fill');
+  const labelEl=document.getElementById('bulk-progress-label');
+  if(barEl){barEl.style.display='block';fillEl.style.width='0%';}
+  if(labelEl){labelEl.style.display='block';labelEl.textContent='Iniciando...';}
   const stepEls=bulkFiles.map((f,i)=>{
     const s=document.createElement('div');s.className='progress-step pending';
     const dd=new Date((f.assignedDay||ds(new Date()))+'T12:00:00');
@@ -1252,6 +1278,9 @@ async function saveBulkStories(){
     if(i+1<bulkFiles.length) batch.push(uploadOne(i+1));
     const results=await Promise.all(batch);
     results.forEach(r=>{if(r)ok++;else fail++;});
+    const pct=Math.round((ok+fail)/bulkFiles.length*100);
+    if(fillEl)fillEl.style.width=pct+'%';
+    if(labelEl)labelEl.textContent=(ok+fail)+' de '+bulkFiles.length+' '+(fail>0?'('+fail+' erros)':'');
   }
   await loadStories();
   showToast(ok+' stories agendados'+(fail?' ('+fail+' erros)':'')+'!','success');
@@ -1495,6 +1524,24 @@ if(typeof Notification!=='undefined'&&Notification.permission==='default'){
 
 
 
+
+
+// ── FILTRO MÍDIA ─────────────────────────────────────────────────────────────
+let _mediaFilter='all';
+function setMediaFilter(type){
+  _mediaFilter=type;
+  ['all','IMAGE','VIDEO'].forEach(t=>{
+    const el=document.getElementById('mf-'+( t==='all'?'all':t==='IMAGE'?'image':'video'));
+    if(el)el.classList.toggle('active',t===type);
+  });
+  if(activeFilter!==null)renderList(activeFilter);
+  else render();
+}
+function applyMediaFilter(stories){
+  if(_mediaFilter==='all')return stories;
+  return stories.filter(s=>s.mediaType===_mediaFilter);
+}
+// ── FIM FILTRO MÍDIA ──────────────────────────────────────────────────────────
 
 // ── UNDO DELETE ─────────────────────────────────────────────────────────────
 let _undoStack=null,_undoTimer=null,_undoBarTimer=null;
