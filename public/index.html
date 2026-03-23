@@ -738,10 +738,7 @@ function mkCell(date,other){
     t.style.borderColor=colors[s.status]||'rgba(255,255,255,0.06)';
     if(s.url&&s.url.startsWith('http')){
       if(s.mediaType==='VIDEO'){
-        const v=document.createElement('video');
-        v.src=s.url;v.muted=true;v.preload='metadata';
-        v.style.cssText='width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
-        v.addEventListener('loadedmetadata',()=>{v.currentTime=1;});
+        const v=mkLazyVideo(s.url,'width:100%;height:100%;object-fit:cover;position:absolute;inset:0');
         t.appendChild(v);
         // Play icon overlay
         const ic=document.createElement('div');
@@ -852,10 +849,7 @@ function renderWeek(){
       t.style.borderColor=colors[s.status]||'rgba(255,255,255,0.06)';
       if(s.url&&s.url.startsWith('http')){
         if(s.mediaType==='VIDEO'){
-          const v=document.createElement('video');
-          v.src=s.url;v.muted=true;v.preload='metadata';
-          v.style.cssText='width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
-          v.addEventListener('loadedmetadata',()=>{v.currentTime=1;});
+          const v=mkLazyVideo(s.url,'width:100%;height:100%;object-fit:cover;position:absolute;inset:0');
           t.appendChild(v);
           const ic=document.createElement('div');
           ic.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;opacity:0.8';
@@ -948,10 +942,7 @@ function renderList(filter){
       cb.onclick=e=>{e.stopPropagation();toggleSelect(s.id,item,cb);};
       const thumb=document.createElement('div');thumb.className='list-thumb';
       if(s.url&&s.url.startsWith('http')&&s.mediaType==='VIDEO'){
-        const vid=document.createElement('video');
-        vid.src=s.url;vid.muted=true;vid.preload='metadata';
-        vid.style.cssText='width:100%;height:100%;object-fit:cover';
-        vid.addEventListener('loadedmetadata',()=>{vid.currentTime=1;});
+        const vid=mkLazyVideo(s.url,'width:100%;height:100%;object-fit:cover');
         thumb.appendChild(vid);
       } else if(s.url&&s.url.startsWith('http')&&s.mediaType!=='VIDEO'){
         const img=document.createElement('img');img.src=s.url;
@@ -1483,6 +1474,34 @@ if(typeof Notification!=='undefined'&&Notification.permission==='default'){
   Notification.requestPermission();
 }
 
+
+
+// ── LAZY VIDEO ──────────────────────────────────────────────────────────────
+const _lazyObs = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const v=e.target;
+      if(v.dataset.src&&!v.src){
+        v.src=v.dataset.src;
+        v.load();
+      }
+      _lazyObs.unobserve(v);
+    }
+  });
+},{rootMargin:'100px'});
+
+function mkLazyVideo(url,styles){
+  const v=document.createElement('video');
+  v.dataset.src=url;  // não seta src ainda
+  v.muted=true;
+  v.preload='none';   // não baixa nada até aparecer na tela
+  v.playsInline=true;
+  if(styles) v.style.cssText=styles;
+  v.addEventListener('loadedmetadata',()=>{v.currentTime=1;});
+  _lazyObs.observe(v);  // só carrega quando visível
+  return v;
+}
+// ── FIM LAZY VIDEO ───────────────────────────────────────────────────────────
 
 // ── CLOUDINARY FPS FIX ──────────────────────────────────────────────────────
 function fixVideoUrl(url) {
