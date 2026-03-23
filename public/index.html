@@ -205,6 +205,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .repeat-hint{font-size:9px;color:var(--gold);margin-top:3px;padding:3px 7px;background:var(--gold-dim);border-radius:4px;display:none;font-family:'Syne',sans-serif;font-weight:600}
 .progress-bar{width:100%;height:2px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:8px;display:none}
 .progress-fill{height:100%;background:var(--gold);border-radius:2px;transition:width 0.4s}
+
+.toast-undo{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--bg3);border:1px solid var(--gold-border);border-radius:8px;padding:10px 16px;font-size:11px;color:var(--text);z-index:200;opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);max-width:90vw;display:flex;align-items:center;gap:12px;font-family:'Syne',sans-serif;font-weight:600;white-space:nowrap}
+.toast-undo.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast-undo-btn{padding:4px 10px;background:var(--gold);color:#000;border:none;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif}
+.toast-undo-bar{position:absolute;bottom:0;left:0;height:2px;background:var(--gold);border-radius:0 0 8px 8px;transition:width linear}
+
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--bg3);border:1px solid var(--gold-border);border-radius:8px;padding:10px 16px;font-size:11px;color:var(--gold);z-index:200;opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);max-width:90vw;text-align:center;font-family:'Syne',sans-serif;font-weight:600;white-space:nowrap}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 .toast.error{border-color:rgba(248,113,113,0.3);color:var(--red)}
@@ -493,6 +499,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 <div class="toast" id="toast"></div>
 
+<div class="toast-undo" id="toast-undo">
+  <span id="toast-undo-msg">Story excluído</span>
+  <button class="toast-undo-btn" onclick="undoDelete()">Desfazer</button>
+  <div class="toast-undo-bar" id="toast-undo-bar" style="width:100%"></div>
+</div>
+
+
 <script>
 const API='https://stories-bot-s4r5.onrender.com';
 const IG_ID='17841466810098587';
@@ -770,7 +783,7 @@ function mkCell(date,other){
     const eb=document.createElement('button');eb.style.cssText='width:14px;height:14px;border-radius:2px;background:rgba(255,255,255,0.8);border:none;font-size:8px;cursor:pointer;display:flex;align-items:center;justify-content:center';eb.textContent='✎';
     eb.onclick=e=>{e.stopPropagation();openEdit(s);};
     const db=document.createElement('button');db.style.cssText='width:14px;height:14px;border-radius:2px;background:rgba(248,113,113,0.9);border:none;font-size:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white';db.textContent='✕';
-    db.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();render();}};
+    db.onclick=e=>{e.stopPropagation();softDelete(s,sbDel);};
     const cpb=document.createElement('button');cpb.style.cssText='width:14px;height:14px;border-radius:2px;background:rgba(74,222,128,0.8);border:none;font-size:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#000';cpb.textContent='⧉';cpb.title='Duplicar';
     cpb.onclick=e=>{e.stopPropagation();dupStory(s);};
     acts.appendChild(eb);acts.appendChild(cpb);acts.appendChild(db);
@@ -877,7 +890,7 @@ function renderWeek(){
       const eb=document.createElement('button');eb.style.cssText='width:16px;height:16px;border-radius:2px;background:rgba(255,255,255,0.8);border:none;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center';eb.textContent='✎';
       eb.onclick=e=>{e.stopPropagation();openEdit(s);};
       const db=document.createElement('button');db.style.cssText='width:16px;height:16px;border-radius:2px;background:rgba(248,113,113,0.9);border:none;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white';db.textContent='✕';
-      db.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();render();}};
+      db.onclick=e=>{e.stopPropagation();softDelete(s,sbDel);};
       const cpb=document.createElement('button');cpb.style.cssText='width:16px;height:16px;border-radius:2px;background:rgba(74,222,128,0.8);border:none;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#000';cpb.textContent='⧉';cpb.title='Duplicar';
       cpb.onclick=e=>{e.stopPropagation();dupStory(s);};
       acts.appendChild(eb);acts.appendChild(cpb);acts.appendChild(db);t.appendChild(acts);
@@ -961,7 +974,7 @@ function renderList(filter){
       const acts=document.createElement('div');acts.className='list-actions';
       const editBtn=document.createElement('button');editBtn.className='list-btn';editBtn.textContent='Editar';editBtn.onclick=e=>{e.stopPropagation();openEdit(s);};
       const dupBtn=document.createElement('button');dupBtn.className='list-btn';dupBtn.textContent='⧉';dupBtn.title='Duplicar';dupBtn.onclick=e=>{e.stopPropagation();dupStory(s);};
-      const delBtn=document.createElement('button');delBtn.className='list-btn del';delBtn.textContent='✕';delBtn.onclick=e=>{e.stopPropagation();if(confirm('Excluir?')){item.style.opacity='0.3';item.style.pointerEvents='none';sbDel(s.id);S=S.filter(x=>x.id!==s.id);sv();renderList(filter);}};
+      const delBtn=document.createElement('button');delBtn.className='list-btn del';delBtn.textContent='✕';delBtn.onclick=e=>{e.stopPropagation();softDelete(s,sbDel);};
       acts.appendChild(editBtn);acts.appendChild(dupBtn);acts.appendChild(delBtn);
       item.appendChild(cb);item.appendChild(thumb);item.appendChild(info);item.appendChild(st);item.appendChild(acts);
       item.onclick=()=>openEdit(s);
@@ -1061,11 +1074,10 @@ async function saveStory(){
   }finally{_saving=false;}
 }
 function delStory(){
-  if(!editing||!confirm('Excluir este story?'))return;
-  sbDel(editing.id);
-  S=S.filter(s=>s.id!==editing.id);sv();closeModal();
-  if(activeFilter!==null)renderList(activeFilter);else render();
-  showToast('Story excluido');
+  if(!editing)return;
+  const s=editing;
+  closeModal();
+  softDelete(s,sbDel);
 }
 function dupDay(dstr){
   const ss=S.filter(s=>s.date===dstr);if(!ss.length)return;
@@ -1482,6 +1494,57 @@ if(typeof Notification!=='undefined'&&Notification.permission==='default'){
 
 
 
+
+
+// ── UNDO DELETE ─────────────────────────────────────────────────────────────
+let _undoStack=null,_undoTimer=null,_undoBarTimer=null;
+
+function softDelete(story, onConfirm){
+  // Guarda no stack
+  _undoStack={story, onConfirm};
+  // Remove da tela imediatamente (UI otimista)
+  S=S.filter(s=>s.id!==story.id);
+  sv();
+  if(activeFilter!==null)renderList(activeFilter);
+  else render();
+  // Mostra toast
+  const el=document.getElementById('toast-undo');
+  const bar=document.getElementById('toast-undo-bar');
+  document.getElementById('toast-undo-msg').textContent='Story excluído';
+  bar.style.transition='none';
+  bar.style.width='100%';
+  el.classList.add('show');
+  // Barra regressiva
+  setTimeout(()=>{
+    bar.style.transition='width 5s linear';
+    bar.style.width='0%';
+  },50);
+  // Timer para confirmar exclusão real
+  clearTimeout(_undoTimer);
+  _undoTimer=setTimeout(()=>{
+    if(_undoStack){
+      _undoStack.onConfirm(_undoStack.story.id);
+      _undoStack=null;
+    }
+    el.classList.remove('show');
+  },5000);
+}
+
+function undoDelete(){
+  if(!_undoStack)return;
+  clearTimeout(_undoTimer);
+  // Restaura story
+  S.push(_undoStack.story);
+  S.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  saveCache(S);
+  sv();
+  if(activeFilter!==null)renderList(activeFilter);
+  else render();
+  _undoStack=null;
+  document.getElementById('toast-undo').classList.remove('show');
+  showToast('Story restaurado!','success');
+}
+// ── FIM UNDO DELETE ──────────────────────────────────────────────────────────
 
 // ── CACHE + PAGINAÇÃO + SKELETON ────────────────────────────────────────────
 const CACHE_KEY='tfx_cache_v1';
