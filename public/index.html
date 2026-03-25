@@ -1577,6 +1577,41 @@ function applyMediaFilter(stories){
 }
 // ── FIM FILTRO MÍDIA ──────────────────────────────────────────────────────────
 
+
+// ── AUTENTICAÇÃO ─────────────────────────────────────────────────────────────
+const SENHA_HASH = '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918'; // admin
+
+async function sha256(str){
+  const buf=new TextEncoder().encode(str);
+  const b=await crypto.subtle.digest('SHA-256',buf);
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+async function doLogin(){
+  const pw=document.getElementById('login-password').value;
+  if(!pw){document.getElementById('login-error').textContent='Digite a senha';return;}
+  const hash=await sha256(pw);
+  if(hash===SENHA_HASH){
+    sessionStorage.setItem('tfx_auth','1');
+    document.getElementById('login-overlay').classList.add('hidden');
+    document.getElementById('login-error').textContent='';
+  } else {
+    document.getElementById('login-error').textContent='Senha incorreta';
+    document.getElementById('login-password').value='';
+    document.getElementById('login-password').focus();
+  }
+}
+
+function checkAuth(){
+  if(!sessionStorage.getItem('tfx_auth')){
+    document.getElementById('login-overlay').classList.remove('hidden');
+    setTimeout(()=>document.getElementById('login-password').focus(),100);
+  } else {
+    document.getElementById('login-overlay').classList.add('hidden');
+  }
+}
+// ── FIM AUTENTICAÇÃO ─────────────────────────────────────────────────────────
+
 // ── UNDO DELETE ─────────────────────────────────────────────────────────────
 let _undoStack=null,_undoTimer=null,_undoBarTimer=null;
 
