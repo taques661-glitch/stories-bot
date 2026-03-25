@@ -226,6 +226,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .toast.error{border-color:rgba(248,113,113,0.3);color:var(--red)}
 .toast.success{border-color:rgba(74,222,128,0.3);color:var(--green)}
 
+
+.login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:0}
+.login-box{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:32px 28px;width:100%;max-width:340px;display:flex;flex-direction:column;gap:16px}
+.login-logo{text-align:center;margin-bottom:4px}
+.login-brand{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--gold);letter-spacing:2px;text-transform:uppercase}
+.login-title{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--text);line-height:1;margin-top:2px}
+.login-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.login-field{display:flex;flex-direction:column;gap:6px}
+.login-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-family:'Syne',sans-serif}
+.login-input{width:100%;padding:11px 13px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color 0.15s}
+.login-input:focus{border-color:var(--gold)}
+.login-btn{width:100%;padding:12px;background:var(--gold);border:none;border-radius:8px;color:#000;font-size:13px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;transition:all 0.15s;margin-top:4px}
+.login-btn:hover{background:var(--gold2)}
+.login-error{font-size:11px;color:var(--red);text-align:center;font-family:'Syne',sans-serif;font-weight:600;min-height:16px}
+.login-overlay.hidden{display:none}
+
 .skel{background:linear-gradient(90deg,var(--bg3) 25%,rgba(255,255,255,0.04) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .skel-cell{min-height:95px;border-radius:8px;border:1px solid var(--border)}
@@ -515,6 +531,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- TELA DE LOGIN -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-brand">Stories</div>
+      <div class="login-title">TFX</div>
+      <div class="login-sub">Painel de administração</div>
+    </div>
+    <div class="login-field">
+      <label class="login-label">Senha</label>
+      <input type="password" class="login-input" id="login-password" placeholder="Digite a senha..." onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="login-btn" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
 
 <div class="toast-undo" id="toast-undo">
   <span id="toast-undo-msg">Story excluído</span>
@@ -1509,7 +1543,7 @@ setInterval(()=>{
 // Restaura última view ao iniciar
 const savedView=localStorage.getItem('tfx_view');
 if(savedView){switchNav(savedView);}else{render();}
-stats();loadStories();
+checkAuth();stats();loadStories();
 // Verifica status do token
 fetch(API+'/token-status').then(r=>r.json()).then(d=>{
   if(d.daysLeft<=7){
