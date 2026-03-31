@@ -373,7 +373,7 @@ app.get("/publish-due", async (req, res) => {
       await sbUpdate(row.id, { status: "publishing" });
       try {
         let mediaUrl = cleanCloudinaryUrl(row.url);
-        const isVideo = row.media_type === "VIDEO";
+        const isVideo = (row.mediaType || row.media_type) === "VIDEO";
         if (isVideo && mediaUrl.includes('cloudinary.com') && !mediaUrl.endsWith('.mp4')) {
           mediaUrl = mediaUrl.replace(/\.[^.]+$/, '.mp4');
         }
