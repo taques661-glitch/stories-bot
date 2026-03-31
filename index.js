@@ -344,12 +344,14 @@ app.post("/stories/publish", upload.single("file"), async (req, res) => {
 app.get("/publish-due", async (req, res) => {
   res.sendStatus(200);
   try {
+    // Usa horário de Manaus (UTC-4)
     const now = new Date();
-    const dateStr = now.toISOString().split("T")[0];
+    const manaus = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+    const dateStr = manaus.toISOString().split("T")[0];
     const times = [];
     for (let i = 0; i <= 3; i++) {
-      const t = new Date(now - i * 60000);
-      times.push(t.toTimeString().substring(0, 5));
+      const t = new Date(manaus - i * 60000);
+      times.push(t.toISOString().substring(11, 16));
     }
     const allRows = [];
     for (const t of times) {
