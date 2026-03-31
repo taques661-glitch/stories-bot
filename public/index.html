@@ -242,6 +242,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .login-error{font-size:11px;color:var(--red);text-align:center;font-family:'Syne',sans-serif;font-weight:600;min-height:16px}
 .login-overlay.hidden{display:none}
 
+
+.trash-empty{text-align:center;padding:60px 20px;color:var(--text3)}
+.trash-restore-btn{padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--gold-border);font-family:'Syne',sans-serif;background:var(--gold-dim);color:var(--gold);transition:all 0.15s}
+.trash-restore-btn:hover{background:var(--gold);color:#000}
+.trash-days{font-size:10px;color:var(--text3);margin-left:auto;font-family:'Syne',sans-serif}
+
 .skel{background:linear-gradient(90deg,var(--bg3) 25%,rgba(255,255,255,0.04) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .skel-cell{min-height:95px;border-radius:8px;border:1px solid var(--border)}
@@ -284,6 +290,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="nav-item" id="nav-scheduled" onclick="switchNav('scheduled')">&#9711; Agendados <span class="nav-count" id="nc-sched">0</span></div>
       <div class="nav-item" id="nav-published" onclick="switchNav('published')">&#10003; Publicados <span class="nav-count green" id="nc-pub">0</span></div>
       <div class="nav-item" id="nav-error" onclick="switchNav('error')">&#10005; Falhos <span class="nav-count red" id="nc-err">0</span></div>
+      <div class="nav-item" id="nav-trash" onclick="switchNav('trash')">&#128465; Lixeira <span class="nav-count" id="nc-trash" style="background:var(--text3)">0</span></div>
     </div>
     <div class="account-card">
       <div class="account-row">
@@ -765,7 +772,7 @@ function switchNav(v){
     render();
   } else {
     activeFilter=v==='all'?null:v;
-    const titles={all:'Todos os Stories',scheduled:'Agendados',published:'Publicados',error:'Falhos'};
+    const titles={all:'Todos os Stories',scheduled:'Agendados',published:'Publicados',error:'Falhos',trash:'Lixeira'};
     document.getElementById('page-title').textContent=titles[v];
     document.getElementById('page-sub').textContent='Lista de stories';
     document.getElementById('main-content').className='';
@@ -1577,6 +1584,96 @@ function applyMediaFilter(stories){
 // ── FIM FILTRO MÍDIA ──────────────────────────────────────────────────────────
 
 
+
+// ── LIXEIRA (SOFT DELETE) ────────────────────────────────────────────────────
+let TRASH = [];
+const TRASH_KEY = 'tfx_trash_v1';
+const TRASH_TTL = 30 * 24 * 60 * 60 * 1000; // 30 dias
+
+function loadTrash(){
+  try{
+    const t=JSON.parse(localStorage.getItem(TRASH_KEY)||'[]');
+    // Remove itens mais antigos que 30 dias
+    TRASH=t.filter(s=>Date.now()-s._deletedAt<TRASH_TTL);
+    saveTrashLocal();
+  }catch(e){TRASH=[];}
+}
+function saveTrashLocal(){
+  try{localStorage.setItem(TRASH_KEY,JSON.stringify(TRASH));}catch(e){}
+  updateTrashCount();
+}
+function updateTrashCount(){
+  const el=document.getElementById('nc-trash');
+  if(el)el.textContent=TRASH.length;
+}
+function moveToTrash(story){
+  story._deletedAt=Date.now();
+  TRASH.unshift(story);
+  saveTrashLocal();
+}
+function restoreFromTrash(id){
+  const idx=TRASH.findIndex(s=>s.id===id);
+  if(idx<0)return;
+  const story=TRASH[idx];
+  delete story._deletedAt;
+  story.status='scheduled';
+  TRASH.splice(idx,1);
+  saveTrashLocal();
+  // Salva de volta no servidor
+  fetch(API+'/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(story)}).catch(()=>{});
+  S.push(story);
+  saveCache(S);
+  sv();
+  showToast('Story restaurado!','success');
+  renderTrash();
+  stats();
+}
+function emptyTrash(){
+  if(!TRASH.length)return;
+  if(!confirm('Esvaziar lixeira permanentemente? Esta ação não pode ser desfeita.'))return;
+  TRASH=[];
+  saveTrashLocal();
+  renderTrash();
+  showToast('Lixeira esvaziada');
+}
+function renderTrash(){
+  const c=document.getElementById('main-content');
+  c.innerHTML='';
+  const wrap=document.createElement('div');wrap.className='list-wrap';
+  if(!TRASH.length){
+    wrap.innerHTML='<div class="trash-empty"><div class="empty-icon">🗑️</div><div class="empty-text">Lixeira vazia</div><div style="font-size:11px;color:var(--text3);margin-top:6px">Stories excluídos aparecem aqui por 30 dias</div></div>';
+    c.appendChild(wrap);return;
+  }
+  // Botão esvaziar
+  const emptyRow=document.createElement('div');
+  emptyRow.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:6px 12px;margin-bottom:8px';
+  emptyRow.innerHTML='<span style="font-size:11px;color:var(--text3);font-family:Syne,sans-serif">'+TRASH.length+' item(s) — deletados em até 30 dias</span>';
+  const emptyBtn=document.createElement('button');
+  emptyBtn.style.cssText='padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid rgba(248,113,113,0.2);font-family:Syne,sans-serif;background:var(--red-dim);color:var(--red)';
+  emptyBtn.textContent='Esvaziar lixeira';emptyBtn.onclick=emptyTrash;
+  emptyRow.appendChild(emptyBtn);wrap.appendChild(emptyRow);
+
+  TRASH.forEach(s=>{
+    const item=document.createElement('div');item.className='list-item';
+    const thumb=document.createElement('div');thumb.className='list-thumb';
+    if(s.url&&s.url.startsWith('http')&&s.mediaType==='VIDEO'){
+      const vid=mkLazyVideo(s.url,'width:100%;height:100%;object-fit:cover');thumb.appendChild(vid);
+    } else if(s.url&&s.url.startsWith('http')){
+      const img=document.createElement('img');img.src=s.url;img.onerror=()=>{thumb.textContent='🖼';};thumb.appendChild(img);
+    } else thumb.textContent=s.mediaType==='VIDEO'?'🎥':'🖼';
+    const info=document.createElement('div');info.className='list-info';
+    const daysLeft=Math.max(0,Math.ceil((TRASH_TTL-(Date.now()-s._deletedAt))/86400000));
+    info.innerHTML='<div class="list-caption">'+(s.caption||'Sem legenda')+'</div><div class="list-meta">'+s.date+' às '+s.time+'</div>';
+    const days=document.createElement('div');days.className='trash-days';days.textContent=daysLeft+'d restantes';
+    const restoreBtn=document.createElement('button');restoreBtn.className='trash-restore-btn';restoreBtn.textContent='Restaurar';
+    restoreBtn.onclick=()=>restoreFromTrash(s.id);
+    item.appendChild(thumb);item.appendChild(info);item.appendChild(days);item.appendChild(restoreBtn);
+    wrap.appendChild(item);
+  });
+  c.appendChild(wrap);
+}
+// ── FIM LIXEIRA ───────────────────────────────────────────────────────────────
+
 // ── AUTENTICAÇÃO ─────────────────────────────────────────────────────────────
 const SENHA_HASH = '435570baf4bf829484895f44a869fbc1105f410b62b90e9ad20e8d910fc3a843'; // admin
 
@@ -1615,29 +1712,27 @@ function checkAuth(){
 let _undoStack=null,_undoTimer=null,_undoBarTimer=null;
 
 function softDelete(story, onConfirm){
-  // Guarda no stack
   _undoStack={story, onConfirm};
-  // Remove da tela imediatamente (UI otimista)
   S=S.filter(s=>s.id!==story.id);
   sv();
-  if(activeFilter!==null)renderList(activeFilter);
+  if(activeFilter==='trash'){renderTrash();}
+  else if(activeFilter!==null)renderList(activeFilter);
   else render();
-  // Mostra toast
   const el=document.getElementById('toast-undo');
   const bar=document.getElementById('toast-undo-bar');
   document.getElementById('toast-undo-msg').textContent='Story excluído';
   bar.style.transition='none';
   bar.style.width='100%';
   el.classList.add('show');
-  // Barra regressiva
   setTimeout(()=>{
     bar.style.transition='width 5s linear';
     bar.style.width='0%';
   },50);
-  // Timer para confirmar exclusão real
   clearTimeout(_undoTimer);
   _undoTimer=setTimeout(()=>{
     if(_undoStack){
+      // Move para lixeira em vez de excluir permanentemente
+      moveToTrash({..._undoStack.story});
       _undoStack.onConfirm(_undoStack.story.id);
       _undoStack=null;
     }
@@ -1648,12 +1743,12 @@ function softDelete(story, onConfirm){
 function undoDelete(){
   if(!_undoStack)return;
   clearTimeout(_undoTimer);
-  // Restaura story
   S.push(_undoStack.story);
   S.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
   saveCache(S);
   sv();
-  if(activeFilter!==null)renderList(activeFilter);
+  if(activeFilter==='trash'){renderTrash();}
+  else if(activeFilter!==null)renderList(activeFilter);
   else render();
   _undoStack=null;
   document.getElementById('toast-undo').classList.remove('show');
