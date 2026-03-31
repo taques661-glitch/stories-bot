@@ -777,7 +777,7 @@ function switchNav(v){
     document.getElementById('page-sub').textContent='Lista de stories';
     document.getElementById('main-content').className='';
     document.getElementById('main-content').style.cssText='flex:1;overflow:hidden;display:flex;flex-direction:column';
-    renderList(activeFilter);
+    if(activeFilter==='trash'){renderTrash();}else{renderList(activeFilter);}
   }
 }
 function switchTab(v){view=v;document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+v).classList.add('active');if(v==='month'){document.getElementById('nav-month').classList.add('active');document.getElementById('nav-week').classList.remove('active');}else{document.getElementById('nav-week').classList.add('active');document.getElementById('nav-month').classList.remove('active');}render();}
