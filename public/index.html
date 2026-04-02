@@ -1553,8 +1553,7 @@ setInterval(()=>{
 // Restaura última view ao iniciar
 const savedView=localStorage.getItem('tfx_view');
 if(savedView){switchNav(savedView);}else{render();}
-loadTrash();
-checkAuth();stats();loadStories();
+checkAuth();stats();loadStories();loadTrash();
 // Verifica status do token
 fetch(API+'/token-status').then(r=>r.json()).then(d=>{
   if(d.daysLeft<=7){
