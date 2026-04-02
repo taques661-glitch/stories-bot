@@ -1941,3 +1941,12 @@ async function checkFps(file,context,onOk){
 </div>
 </body>
 </html>
+function deleteDay(dstr){
+  const ss=S.filter(s=>s.date===dstr);
+  if(!ss.length)return;
+  if(!confirm('Mover '+ss.length+' story(s) do dia '+dstr+' para a lixeira?'))return;
+  ss.forEach(s=>{moveToTrash(s);sbDel(s.id);});
+  S=S.filter(s=>s.date!==dstr);
+  sv();render();stats();
+  showToast(ss.length+' story(s) movidos para a lixeira','success');
+}
