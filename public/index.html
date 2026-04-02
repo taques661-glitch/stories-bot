@@ -1505,7 +1505,7 @@ function renderDupCal(){
   const todayStr=ds(new Date());
   const addDay=(date,other)=>{
     const dstr=ds(date);
-    const isPast=dstr<=dupSrcDate;
+    const isPast=dstr===dupSrcDate;
     const el=document.createElement('div');
     el.className='bulk-cal-day'+(other?' other':'')+(isPast?' past':'')+(dstr===todayStr?' today':'')+(dupTargetDays.has(dstr)?' selected':'');
     el.textContent=date.getDate();
@@ -1552,7 +1552,7 @@ setInterval(()=>{
 }, 180000); // 3 min — reduzido para aliviar carga
 // Restaura última view ao iniciar
 const savedView=localStorage.getItem('tfx_view');
-if(savedView){switchNav(savedView);}else{render();}
+loadTrash();if(savedView){switchNav(savedView);}else{render();}
 checkAuth();stats();loadStories();
 // Verifica status do token
 fetch(API+'/token-status').then(r=>r.json()).then(d=>{
