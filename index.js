@@ -349,7 +349,7 @@ app.get("/publish-due", async (req, res) => {
     const manaus = new Date(now.getTime() - 4 * 60 * 60 * 1000);
     const dateStr = manaus.toISOString().split("T")[0];
     const times = [];
-    for (let i = 0; i <= 3; i++) {
+    for (let i = 0; i <= 30; i++) {
       const t = new Date(manaus - i * 60000);
       times.push(t.toISOString().substring(11, 16));
     }
