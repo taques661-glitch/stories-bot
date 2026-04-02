@@ -805,7 +805,9 @@ function mkCell(date,other){
   if(!other&&ss.length){
     const acts=document.createElement('div');acts.className='day-actions';
     const dup=document.createElement('button');dup.className='day-action-btn';dup.title='Duplicar para proxima semana';dup.textContent='D';
-    dup.onclick=e=>{e.stopPropagation();openDupModal(dstr);};acts.appendChild(dup);cell.appendChild(acts);
+    dup.onclick=e=>{e.stopPropagation();openDupModal(dstr);};acts.appendChild(dup);
+    const del=document.createElement('button');del.className='day-action-btn';del.title='Mover dia para lixeira';del.textContent='🗑';del.style.cssText='background:rgba(248,113,113,0.15);color:var(--red);';
+    del.onclick=e=>{e.stopPropagation();deleteDay(dstr);};acts.appendChild(del);cell.appendChild(acts);
   }
   // Thumbnails estilo pasta
   const thumbWrap=document.createElement('div');
