@@ -1552,7 +1552,8 @@ setInterval(()=>{
 }, 180000); // 3 min — reduzido para aliviar carga
 // Restaura última view ao iniciar
 const savedView=localStorage.getItem('tfx_view');
-loadTrash();if(savedView){switchNav(savedView);}else{render();}
+if(savedView){switchNav(savedView);}else{render();}
+loadTrash();
 checkAuth();stats();loadStories();
 // Verifica status do token
 fetch(API+'/token-status').then(r=>r.json()).then(d=>{
