@@ -1823,13 +1823,21 @@ const _lazyObs = new IntersectionObserver((entries)=>{
 
 function mkLazyVideo(url,styles){
   const v=document.createElement('video');
-  v.dataset.src=url;  // não seta src ainda
+  v.dataset.src=url;
   v.muted=true;
-  v.preload='none';   // não baixa nada até aparecer na tela
+  v.preload='none';
   v.playsInline=true;
   if(styles) v.style.cssText=styles;
+  // Usa poster do Cloudinary para preview instantâneo
+  if(url && url.includes('cloudinary.com')){
+    const poster=url
+      .replace('/video/upload/','/video/upload/so_1,f_jpg,q_auto,w_200/')
+      .replace(/\.mp4$/,'.jpg')
+      .replace(/\.mov$/,'.jpg');
+    v.poster=poster;
+  }
   v.addEventListener('loadedmetadata',()=>{v.currentTime=1;});
-  _lazyObs.observe(v);  // só carrega quando visível
+  _lazyObs.observe(v);
   return v;
 }
 // ── FIM LAZY VIDEO ───────────────────────────────────────────────────────────
