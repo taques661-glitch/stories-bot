@@ -1853,8 +1853,8 @@ function fixVideoUrl(url) {
   if (!url || typeof url !== 'string') return url;
   if (!url.includes('res.cloudinary.com') || !url.includes('/video/upload/')) return url;
   // Já tem transformação?
-  if (url.includes('fps_30') || url.includes('vc_h264')) return url;
-  return url.replace('/video/upload/', '/video/upload/vc_h264,fps_30,q_auto/');
+  // Transformações removidas para economizar créditos Cloudinary
+  return url;
 }
 // ── FIM CLOUDINARY FPS FIX ──────────────────────────────────────────────────
 
