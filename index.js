@@ -86,7 +86,9 @@ async function sbDelete(id) {
 
 function cleanCloudinaryUrl(url) {
   if (!url || !url.includes('cloudinary.com')) return url;
-  return url.replace(/\/upload\/[^/]+\/v/, '/upload/v');
+  // Mantém transformações válidas do Cloudinary (vc_h264, fps_30, etc)
+  // Remove apenas transformações duplicadas ou malformadas
+  return url;
 }
 
 async function waitForVideo(containerId, token) {
