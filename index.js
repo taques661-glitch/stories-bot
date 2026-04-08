@@ -279,13 +279,25 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file" });
     const isVideo = req.file.mimetype.startsWith("video");
     const tenantId = req.body.tenant_id || req.query.tenant_id || "kevin_admin";
-    const ext = req.file.originalname.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
+    let fileBuffer = req.file.buffer;
+    let ext = req.file.originalname.split('.').pop().toLowerCase() || (isVideo ? 'mp4' : 'jpg');
+    // Converte MOV/HEVC para MP4 via FFmpeg
+    if(isVideo && (ext === 'mov' || ext === 'hevc' || ext === 'heic')){
+      const { execSync } = require('child_process');
+      const tmp = `/tmp/${Date.now()}`;
+      require('fs').writeFileSync(`${tmp}.${ext}`, fileBuffer);
+      execSync(`ffmpeg -i ${tmp}.${ext} -c:v libx264 -c:a aac -y ${tmp}.mp4 2>/dev/null`);
+      fileBuffer = require('fs').readFileSync(`${tmp}.mp4`);
+      require('fs').unlinkSync(`${tmp}.${ext}`);
+      require('fs').unlinkSync(`${tmp}.mp4`);
+      ext = 'mp4';
+    }
     const filename = `${tenantId}/${Date.now()}.${ext}`;
     
     // Upload para Supabase Storage
     const uploadRes = await axios.post(
       `${SUPABASE_URL}/storage/v1/object/stories-tfx/${filename}`,
-      req.file.buffer,
+      fileBuffer,
       {
         headers: {
           'apikey': SUPABASE_KEY,
