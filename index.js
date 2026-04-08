@@ -273,47 +273,20 @@ app.delete("/schedule/:id", async (req, res) => {
   }
 });
 
-// UPLOAD to Supabase Storage
+// UPLOAD to Cloudinary
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file" });
     const isVideo = req.file.mimetype.startsWith("video");
-    const tenantId = req.body.tenant_id || req.query.tenant_id || "kevin_admin";
-    let fileBuffer = req.file.buffer;
-    let ext = req.file.originalname.split('.').pop().toLowerCase() || (isVideo ? 'mp4' : 'jpg');
-    // Converte MOV/HEVC para MP4 via FFmpeg
-    if(isVideo && (ext === 'mov' || ext === 'hevc' || ext === 'heic')){
-      const { execSync } = require('child_process');
-      const tmp = `/tmp/${Date.now()}`;
-      require('fs').writeFileSync(`${tmp}.${ext}`, fileBuffer);
-      execSync(`ffmpeg -i ${tmp}.${ext} -c:v libx264 -c:a aac -y ${tmp}.mp4 2>/dev/null`);
-      fileBuffer = require('fs').readFileSync(`${tmp}.mp4`);
-      require('fs').unlinkSync(`${tmp}.${ext}`);
-      require('fs').unlinkSync(`${tmp}.mp4`);
-      ext = 'mp4';
-    }
-    const filename = `${tenantId}/${Date.now()}.${ext}`;
-    
-    // Upload para Supabase Storage
-    const uploadRes = await axios.post(
-      `${SUPABASE_URL}/storage/v1/object/stories-tfx/${filename}`,
-      fileBuffer,
-      {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': req.file.mimetype,
-          'x-upsert': 'true'
-        },
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
-      }
-    );
-    
-    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/stories-tfx/${filename}`;
-    res.json({ url: publicUrl, mediaType: isVideo ? "VIDEO" : "IMAGE" });
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { resource_type: isVideo ? "video" : "image", folder: "stories_tfx", format: isVideo ? "mp4" : undefined },
+        (err, result) => err ? reject(err) : resolve(result)
+      );
+      stream.end(req.file.buffer);
+    });
+    res.json({ url: cleanCloudinaryUrl(result.secure_url), mediaType: isVideo ? "VIDEO" : "IMAGE" });
   } catch (e) {
-    console.error('Upload error:', e.response?.data || e.message);
     res.status(500).json({ error: e.message });
   }
 });
