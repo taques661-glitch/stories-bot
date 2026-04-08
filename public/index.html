@@ -565,6 +565,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 
 <script>
+
+async function uploadToBackend(file, onProgress){
+  return new Promise((resolve, reject)=>{
+    const fd=new FormData();
+    fd.append('file', file);
+    fd.append('tenant_id', TENANT_ID||'kevin_admin');
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST', API+'/upload');
+    if(onProgress) xhr.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*100));};
+    xhr.onload=()=>{
+      if(xhr.status===200){
+        resolve(JSON.parse(xhr.responseText));
+      } else {
+        reject(new Error('Upload falhou: '+xhr.status));
+      }
+    };
+    xhr.onerror=()=>reject(new Error('Erro de rede'));
+    xhr.send(fd);
+  });
+}
+
 const API='https://stories-bot-s4r5.onrender.com';
 let _mediaFilter="all";const IG_ID='17841466810098587';
 const MO=['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -676,26 +697,9 @@ async function _doHandleFileSelect(f){
   showToast('Fazendo upload...');
   try{
     const isVid2=f.type.includes('video');
-    const fd=new FormData();
-    fd.append('file',f);
-    fd.append('upload_preset','stories_tfx_unsigned');
-    fd.append('folder','stories_tfx');
-    const cloudName='dbwdldowa';
-    const resourceType=isVid2?'video':'image';
-    // Usa XHR em vez de fetch para suportar arquivos grandes sem timeout
-    const d=await new Promise((resolve,reject)=>{
-      const xhr=new XMLHttpRequest();
-      xhr.open('POST',`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`);
-      xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);showToast(`Enviando... ${pct}%`);}};
-      xhr.onload=()=>{try{resolve(JSON.parse(xhr.responseText));}catch(e){reject(new Error('Resposta inválida'));}};
-      xhr.onerror=()=>reject(new Error('Erro de conexão'));
-      xhr.timeout=300000; // 5 minutos
-      xhr.ontimeout=()=>reject(new Error('Timeout — vídeo muito grande'));
-      xhr.send(fd);
-    });
-    if(d.error){showToast('Erro: '+d.error.message,true);return;}
-    let uploadedUrl=d.secure_url;
-    if(isVid2) uploadedUrl=uploadedUrl.replace(/\.[^.]+$/, '.mp4');
+    const d=await uploadToBackend(f, pct=>showToast(`Enviando... ${pct}%`));
+    if(d.error){showToast('Erro: '+d.error,true);return;}
+    let uploadedUrl=d.url;
     const uploadedIsVideo=isVid2;
     document.getElementById('input-url').value=uploadedUrl;
     ['url','upload'].forEach(x=>{
@@ -729,22 +733,11 @@ async function _doHandlePublishFileSelect(f){
   if(isVid){document.getElementById('pnow-prev-video').src=localUrl;document.getElementById('pnow-prev-video').style.display='block';}
   else{document.getElementById('pnow-prev-img').src=localUrl;document.getElementById('pnow-prev-img').style.display='block';}
   setPhone(document.getElementById('pnow-frame-img'),document.getElementById('pnow-frame-video'),document.getElementById('pnow-empty'),localUrl,isVid);
-  // Upload direto ao Cloudinary (evita timeout do Render)
   showToast('Fazendo upload...');
   try{
-    const fd=new FormData();
-    fd.append('file',f);
-    fd.append('upload_preset','stories_tfx_unsigned');
-    fd.append('folder','stories_tfx');
-    const cloudName='dbwdldowa';
-    const resourceType=isVid?'video':'image';
-    const r=await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,{method:'POST',body:fd});
-    const d=await r.json();
-    if(d.error){showToast('Erro: '+d.error.message,true);return;}
-    // Força extensão .mp4 para vídeos
-    let uploadedUrl=d.secure_url;
-    if(isVid) uploadedUrl=uploadedUrl.replace(/\.[^.]+$/, '.mp4');
-    if(isVid) uploadedUrl=fixVideoUrl(uploadedUrl);
+    const d=await uploadToBackend(f, pct=>showToast(`Enviando... ${pct}%`));
+    if(d.error){showToast('Erro: '+d.error,true);return;}
+    let uploadedUrl=d.url;
     pubFile=null;
     document.getElementById('pnow-url').value=uploadedUrl;
     document.getElementById('pnow-section-url').style.display='block';
@@ -1105,19 +1098,10 @@ async function saveStory(){
     showToast('Fazendo upload...');
     try{
       const isVid2=selFile.type.includes('video');
-      const fd=new FormData();
-      fd.append('file',selFile);
-      fd.append('upload_preset','stories_tfx_unsigned');
-      fd.append('folder','stories_tfx');
-      const cloudName='dbwdldowa';
-      const resourceType=isVid2?'video':'image';
-      const r=await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,{method:'POST',body:fd});
-      const d=await r.json();
-      if(d.error) throw new Error(d.error.message);
-      fu=d.secure_url;
-      if(isVid2) fu=fu.replace(/\.[^.]+$/, '.mp4');
-      if(isVid2) fu=fixVideoUrl(fu);
-      mt=isVid2?'VIDEO':'IMAGE';
+      const d=await uploadToBackend(selFile, pct=>showToast(`Enviando... ${pct}%`));
+      if(d.error) throw new Error(d.error);
+      fu=d.url;
+      mt=d.mediaType||( isVid2?'VIDEO':'IMAGE');
     }catch(e){showToast('Erro no upload: '+e.message,true);return;}
   }
   if(editing){
@@ -1286,27 +1270,10 @@ async function saveBulkStories(){
       try{
         const f=bf.file;
         const isVid2=f.type.includes('video');
-        const fd=new FormData();
-        fd.append('file',f);
-        fd.append('upload_preset','stories_tfx_unsigned');
-        fd.append('folder','stories_tfx');
-        const cloudName='dbwdldowa';
-        const resourceType=isVid2?'video':'image';
-        const d=await new Promise((resolve,reject)=>{
-          const xhr=new XMLHttpRequest();
-          xhr.open('POST',`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`);
-          xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);stepEls[i].textContent=(i+1)+'. '+pct+'%';}};
-          xhr.onload=()=>{try{resolve(JSON.parse(xhr.responseText));}catch(e){reject(new Error('Resposta inválida'));}};
-          xhr.onerror=()=>reject(new Error('Erro de conexão'));
-          xhr.timeout=600000; // 10 minutos
-          xhr.ontimeout=()=>reject(new Error('Timeout — vídeo muito grande'));
-          xhr.send(fd);
-        });
-        if(d.error) throw new Error(d.error.message);
-        mediaUrl=d.secure_url;
-        if(isVid2) mediaUrl=mediaUrl.replace(/\.[^.]+$/, '.mp4');
-        if(isVid2) mediaUrl=fixVideoUrl(mediaUrl);
-        mediaType=isVid2?'VIDEO':'IMAGE';
+        const d=await uploadToBackend(f, pct=>{stepEls[i].textContent=(i+1)+'. '+pct+'%';});
+        if(d.error) throw new Error(d.error);
+        mediaUrl=d.url;
+        mediaType=d.mediaType||(isVid2?'VIDEO':'IMAGE');
       }catch(e){stepEls[i].className='progress-step fail';stepEls[i].title=e.message;return null;}
     }
     const story={id:Date.now()+i*7+Math.floor(Math.random()*999),url:mediaUrl,date:bf.assignedDay||ds(new Date()),time:bf.time||'09:00',caption,repeat:'none',status:'scheduled',mediaType,link:'',ig_id:IG_ID};
