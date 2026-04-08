@@ -253,7 +253,9 @@ app.patch("/schedule/:id", async (req, res) => {
     if (req.body.caption !== undefined) fields.caption = req.body.caption;
     if (req.body.url) fields.url = req.body.url;
     if (req.body.link !== undefined) fields.link = req.body.link;
-    if (req.body.mediaType) fields.media_type = req.body.mediaType;
+    if (req.body.mediaType) fields.mediaType = req.body.mediaType;
+    // Se reagendando (tem date ou time), força status scheduled
+    if ((req.body.date || req.body.time) && !req.body.status) fields.status = 'scheduled';
     await sbUpdate(req.params.id, fields);
     res.json({ success: true });
   } catch (e) {
