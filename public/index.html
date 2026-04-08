@@ -566,11 +566,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 <script>
 
+const API='https://stories-bot-s4r5.onrender.com';
+
 async function uploadToBackend(file, onProgress){
   return new Promise((resolve, reject)=>{
     const fd=new FormData();
     fd.append('file', file);
-    fd.append('tenant_id', TENANT_ID||'kevin_admin');
+    fd.append('tenant_id', typeof TENANT_ID!=='undefined'?TENANT_ID:'kevin_admin');
     const xhr=new XMLHttpRequest();
     xhr.open('POST', API+'/upload');
     if(onProgress) xhr.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*100));};
@@ -585,8 +587,6 @@ async function uploadToBackend(file, onProgress){
     xhr.send(fd);
   });
 }
-
-const API='https://stories-bot-s4r5.onrender.com';
 let _mediaFilter="all";const IG_ID='17841466810098587';
 const MO=['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DY=['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
