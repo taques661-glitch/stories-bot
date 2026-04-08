@@ -1830,11 +1830,17 @@ function mkLazyVideo(url,styles){
   if(styles) v.style.cssText=styles;
   // Usa poster do Cloudinary para preview instantâneo
   if(url && url.includes('cloudinary.com')){
-    const poster=url
-      .replace('/video/upload/','/video/upload/so_1,f_jpg,q_auto,w_200/')
-      .replace(/\.mp4$/,'.jpg')
-      .replace(/\.mov$/,'.jpg');
-    v.poster=poster;
+    // Extrai só o path após /upload/ removendo transformações existentes
+    const uploadIdx=url.indexOf('/upload/');
+    if(uploadIdx>=0){
+      const base=url.substring(0,uploadIdx+8); // até /upload/
+      const rest=url.substring(uploadIdx+8);
+      // Remove transformações existentes (tudo antes do /v123...)
+      const vIdx=rest.search(/v\d+\//);
+      const filePath=vIdx>=0?rest.substring(vIdx):rest;
+      const poster=base+'so_1,f_jpg,q_auto,w_300/'+filePath.replace(/\.mp4$/,'.jpg').replace(/\.mov$/,'.jpg');
+      v.poster=poster;
+    }
   }
   v.addEventListener('loadedmetadata',()=>{v.currentTime=1;});
   _lazyObs.observe(v);
