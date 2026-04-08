@@ -273,20 +273,35 @@ app.delete("/schedule/:id", async (req, res) => {
   }
 });
 
-// UPLOAD to Cloudinary
+// UPLOAD to Supabase Storage
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file" });
     const isVideo = req.file.mimetype.startsWith("video");
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { resource_type: isVideo ? "video" : "image", folder: "stories_tfx", format: isVideo ? "mp4" : undefined },
-        (err, result) => err ? reject(err) : resolve(result)
-      );
-      stream.end(req.file.buffer);
-    });
-    res.json({ url: cleanCloudinaryUrl(result.secure_url), mediaType: isVideo ? "VIDEO" : "IMAGE" });
+    const tenantId = req.body.tenant_id || req.query.tenant_id || "kevin_admin";
+    const ext = req.file.originalname.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
+    const filename = `${tenantId}/${Date.now()}.${ext}`;
+    
+    // Upload para Supabase Storage
+    const uploadRes = await axios.post(
+      `${SUPABASE_URL}/storage/v1/object/stories-tfx/${filename}`,
+      req.file.buffer,
+      {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': req.file.mimetype,
+          'x-upsert': 'true'
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      }
+    );
+    
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/stories-tfx/${filename}`;
+    res.json({ url: publicUrl, mediaType: isVideo ? "VIDEO" : "IMAGE" });
   } catch (e) {
+    console.error('Upload error:', e.response?.data || e.message);
     res.status(500).json({ error: e.message });
   }
 });
