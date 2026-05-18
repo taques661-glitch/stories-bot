@@ -1828,19 +1828,10 @@ function mkLazyVideo(url,styles){
   v.preload='none';
   v.playsInline=true;
   if(styles) v.style.cssText=styles;
-  // Usa poster do Cloudinary para preview instantâneo
-  if(url && url.includes('cloudinary.com')){
-    // Extrai só o path após /upload/ removendo transformações existentes
-    const uploadIdx=url.indexOf('/upload/');
-    if(uploadIdx>=0){
-      const base=url.substring(0,uploadIdx+8); // até /upload/
-      const rest=url.substring(uploadIdx+8);
-      // Remove transformações existentes (tudo antes do /v123...)
-      const vIdx=rest.search(/v\d+\//);
-      const filePath=vIdx>=0?rest.substring(vIdx):rest;
-      const poster=base+'so_1,f_jpg,q_auto,w_300/'+filePath.replace(/\.mp4$/,'.jpg').replace(/\.mov$/,'.jpg');
-      v.poster=poster;
-    }
+  // Poster via Cloudinary (so_1 = frame do segundo 1, sem custo extra de transformação de vídeo)
+  if(url && url.includes('cloudinary.com') && url.includes('/video/upload/')){
+    const poster=url.replace('/video/upload/','/video/upload/so_1,f_jpg,w_200,q_60/').replace(/\.mp4$/,'.jpg').replace(/\.mov$/,'.jpg');
+    v.poster=poster;
   }
   v.addEventListener('loadedmetadata',()=>{v.currentTime=1;});
   _lazyObs.observe(v);
