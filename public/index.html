@@ -251,6 +251,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .cal-sel-bar .del-btn:hover{background:rgba(248,113,113,0.3)}
 .cal-sel-bar .clr-btn{background:rgba(255,255,255,0.06);color:var(--text3);border:1px solid var(--border)}
 
+
+.bib-wrap{padding:16px;overflow-y:auto;height:100%}
+.bib-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.bib-pastas{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.bib-pasta-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-size:11px;font-family:'Syne',sans-serif;font-weight:600;cursor:pointer;transition:all 0.15s}
+.bib-pasta-btn.active{background:var(--gold);color:#000;border-color:var(--gold)}
+.bib-pasta-btn:hover{border-color:var(--gold-border)}
+.bib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}
+.bib-item{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:9/16;background:var(--bg3);border:1px solid var(--border);cursor:pointer;transition:all 0.15s}
+.bib-item:hover{border-color:var(--gold)}
+.bib-item.selected{border:2px solid var(--gold);outline:2px solid var(--gold)}
+.bib-item img,.bib-item video{width:100%;height:100%;object-fit:cover}
+.bib-item-actions{position:absolute;top:4px;right:4px;display:none;gap:2px;z-index:3}
+.bib-item:hover .bib-item-actions{display:flex}
+.bib-action-btn{width:18px;height:18px;border-radius:3px;border:none;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.bib-sel-bar{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--gold-border);border-radius:10px;padding:8px 16px;display:flex;align-items:center;gap:12px;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,0.5);font-family:'Syne',sans-serif;font-size:12px;color:var(--text)}
+.bib-sel-bar button{padding:5px 12px;border-radius:6px;border:none;font-size:11px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif}
+.bib-empty{text-align:center;padding:60px 20px;color:var(--text3)}
+.nova-pasta-input{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;width:200px}
+.nova-pasta-input:focus{border-color:var(--gold)}
+
 .trash-empty{text-align:center;padding:60px 20px;color:var(--text3)}
 .trash-restore-btn{padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--gold-border);font-family:'Syne',sans-serif;background:var(--gold-dim);color:var(--gold);transition:all 0.15s}
 .trash-restore-btn:hover{background:var(--gold);color:#000}
@@ -298,6 +319,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="nav-item" id="nav-scheduled" onclick="switchNav('scheduled')">&#9711; Agendados <span class="nav-count" id="nc-sched">0</span></div>
       <div class="nav-item" id="nav-published" onclick="switchNav('published')">&#10003; Publicados <span class="nav-count green" id="nc-pub">0</span></div>
       <div class="nav-item" id="nav-error" onclick="switchNav('error')">&#10005; Falhos <span class="nav-count red" id="nc-err">0</span></div>
+      <div class="nav-item" id="nav-biblioteca" onclick="switchNav('biblioteca')">&#128193; Biblioteca</div>
       <div class="nav-item" id="nav-trash" onclick="switchNav('trash')">&#128465; Lixeira <span class="nav-count" id="nc-trash" style="background:var(--text3)">0</span></div>
     </div>
     <div class="account-card">
@@ -780,17 +802,227 @@ function switchNav(v){
     render();
   } else {
     activeFilter=v==='all'?null:v;
-    const titles={all:'Todos os Stories',scheduled:'Agendados',published:'Publicados',error:'Falhos',trash:'Lixeira'};
+    const titles={all:'Todos os Stories',scheduled:'Agendados',published:'Publicados',error:'Falhos',trash:'Lixeira',biblioteca:'Biblioteca'};
     document.getElementById('page-title').textContent=titles[v];
     document.getElementById('page-sub').textContent='Lista de stories';
     document.getElementById('main-content').className='';
     document.getElementById('main-content').style.cssText='flex:1;overflow:hidden;display:flex;flex-direction:column';
-    if(activeFilter==='trash'){renderTrash();}else{renderList(activeFilter);}
+    if(activeFilter==='trash'){renderTrash();}else if(activeFilter==='biblioteca'){loadBiblioteca();}else{renderList(activeFilter);}
   }
 }
 function switchTab(v){view=v;document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+v).classList.add('active');if(v==='month'){document.getElementById('nav-month').classList.add('active');document.getElementById('nav-week').classList.remove('active');}else{document.getElementById('nav-week').classList.add('active');document.getElementById('nav-month').classList.remove('active');}render();}
 function prevPeriod(){if(view==='month'){cur.setMonth(cur.getMonth()-1);renderSkeleton();loadStories(false);}else{cur.setDate(cur.getDate()-7);render();}}
 function nextPeriod(){if(view==='month'){cur.setMonth(cur.getMonth()+1);renderSkeleton();loadStories(false);}else{cur.setDate(cur.getDate()+7);render();}}
+
+// ── BIBLIOTECA ────────────────────────────────────────────────────────────────
+let bibPastas = [];
+let bibAtual = null;
+let bibItens = [];
+let bibSel = new Set();
+
+async function loadBiblioteca(pasta=null){
+  try {
+    const r = await fetch(API+'/biblioteca'+(pasta?'?pasta='+encodeURIComponent(pasta):''));
+    const d = await r.json();
+    bibPastas = d.pastas || [];
+    bibItens = d.itens || [];
+    bibAtual = pasta || (bibPastas[0] || null);
+    renderBiblioteca();
+  } catch(e){ showToast('Erro ao carregar biblioteca','error'); }
+}
+
+function renderBiblioteca(){
+  const c = document.getElementById('main-content');
+  c.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'bib-wrap';
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'bib-header';
+  hdr.innerHTML = '<span style="font-family:Syne,sans-serif;font-weight:700;font-size:14px">📁 Biblioteca de Conteúdo</span>';
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-gold';
+  addBtn.style.cssText = 'padding:6px 14px;font-size:11px';
+  addBtn.textContent = '+ Nova Pasta';
+  addBtn.onclick = novaPasta;
+  hdr.appendChild(addBtn);
+  wrap.appendChild(hdr);
+
+  // Pastas
+  if(bibPastas.length > 0){
+    const pastasDiv = document.createElement('div');
+    pastasDiv.className = 'bib-pastas';
+    bibPastas.forEach(p => {
+      const btn = document.createElement('button');
+      btn.className = 'bib-pasta-btn' + (p === bibAtual ? ' active' : '');
+      btn.textContent = p;
+      btn.onclick = () => { bibAtual = p; loadBiblioteca(p); };
+      pastasDiv.appendChild(btn);
+    });
+    wrap.appendChild(pastasDiv);
+  }
+
+  // Upload area
+  if(bibAtual){
+    const upArea = document.createElement('div');
+    upArea.style.cssText = 'margin-bottom:12px;display:flex;gap:8px;align-items:center';
+    const upBtn = document.createElement('button');
+    upBtn.className = 'btn-gold';
+    upBtn.style.cssText = 'padding:6px 14px;font-size:11px;position:relative;overflow:hidden';
+    upBtn.innerHTML = '⬆ Adicionar mídia <input type="file" accept="image/*,video/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer" onchange="bibUpload(this.files)">';
+    upArea.appendChild(upBtn);
+    if(bibSel.size > 0){
+      const agBtn = document.createElement('button');
+      agBtn.style.cssText = 'padding:6px 14px;font-size:11px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;font-family:Syne,sans-serif';
+      agBtn.textContent = '📅 Agendar ' + bibSel.size + ' selecionado(s)';
+      agBtn.onclick = bibAgendar;
+      upArea.appendChild(agBtn);
+      const clrBtn = document.createElement('button');
+      clrBtn.style.cssText = 'padding:6px 14px;font-size:11px;font-weight:700;background:rgba(255,255,255,0.06);color:var(--text3);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-family:Syne,sans-serif';
+      clrBtn.textContent = '✕ Limpar';
+      clrBtn.onclick = () => { bibSel.clear(); renderBiblioteca(); };
+      upArea.appendChild(clrBtn);
+    }
+    wrap.appendChild(upArea);
+  }
+
+  // Grid de itens
+  const filtrados = bibAtual ? bibItens.filter(i => i.pasta === bibAtual) : bibItens;
+  if(filtrados.length === 0){
+    const empty = document.createElement('div');
+    empty.className = 'bib-empty';
+    empty.innerHTML = bibAtual ? '<div style="font-size:32px">📭</div><div>Pasta vazia — adicione mídias acima</div>' : '<div style="font-size:32px">📁</div><div>Crie uma pasta para começar</div>';
+    wrap.appendChild(empty);
+  } else {
+    const grid = document.createElement('div');
+    grid.className = 'bib-grid';
+    filtrados.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'bib-item' + (bibSel.has(item.id) ? ' selected' : '');
+      el.onclick = () => { 
+        if(bibSel.has(item.id)) bibSel.delete(item.id); 
+        else bibSel.add(item.id);
+        renderBiblioteca();
+      };
+      if(item.mediaType === 'VIDEO'){
+        const v = document.createElement('video');
+        v.src = item.url; v.muted = true; v.preload = 'metadata';
+        v.style.cssText = 'width:100%;height:100%;object-fit:cover';
+        el.appendChild(v);
+        const ic = document.createElement('div');
+        ic.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;pointer-events:none';
+        ic.textContent = '▶'; el.appendChild(ic);
+      } else {
+        const img = document.createElement('img');
+        img.src = item.url;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover';
+        el.appendChild(img);
+      }
+      // Checkbox
+      const cb = document.createElement('div');
+      cb.style.cssText = 'position:absolute;top:4px;left:4px;width:16px;height:16px;border-radius:4px;border:2px solid white;background:'+(bibSel.has(item.id)?'var(--gold)':'rgba(0,0,0,0.4)')+';display:flex;align-items:center;justify-content:center;font-size:9px;color:#000';
+      cb.textContent = bibSel.has(item.id) ? '✓' : '';
+      el.appendChild(cb);
+      // Botão deletar
+      const acts = document.createElement('div');
+      acts.className = 'bib-item-actions';
+      const del = document.createElement('button');
+      del.className = 'bib-action-btn';
+      del.style.cssText = 'background:rgba(248,113,113,0.9);color:white';
+      del.textContent = '✕';
+      del.onclick = e => { e.stopPropagation(); bibDelete(item.id); };
+      acts.appendChild(del);
+      el.appendChild(acts);
+      grid.appendChild(el);
+    });
+    wrap.appendChild(grid);
+  }
+  c.appendChild(wrap);
+}
+
+async function novaPasta(){
+  const nome = prompt('Nome da pasta:');
+  if(!nome || !nome.trim()) return;
+  bibPastas.push(nome.trim());
+  bibAtual = nome.trim();
+  renderBiblioteca();
+}
+
+async function bibUpload(files){
+  if(!bibAtual){ showToast('Selecione uma pasta primeiro','error'); return; }
+  showToast('Enviando ' + files.length + ' arquivo(s)...');
+  let ok = 0;
+  for(const file of files){
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', 'stories_tfx_unsigned');
+      fd.append('folder', 'biblioteca_tfx/'+bibAtual);
+      const isVid = file.type.startsWith('video');
+      const r = await fetch(`https://api.cloudinary.com/v1_1/dbwdldowa/${isVid?'video':'image'}/upload`, {method:'POST', body:fd});
+      const d = await r.json();
+      if(d.error) throw new Error(d.error.message);
+      // Salva no backend
+      await fetch(API+'/biblioteca', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          id: Date.now() + Math.floor(Math.random()*999999),
+          pasta: bibAtual,
+          url: d.secure_url,
+          mediaType: isVid ? 'VIDEO' : 'IMAGE',
+          caption: ''
+        })
+      });
+      ok++;
+    } catch(e){ console.error(e); }
+  }
+  showToast(ok + ' arquivo(s) adicionado(s)!', 'success');
+  loadBiblioteca(bibAtual);
+}
+
+async function bibDelete(id){
+  if(!confirm('Remover da biblioteca?')) return;
+  await fetch(API+'/biblioteca/'+id, {method:'DELETE'});
+  bibItens = bibItens.filter(i => i.id !== id);
+  bibSel.delete(id);
+  renderBiblioteca();
+}
+
+async function bibAgendar(){
+  if(!bibSel.size) return;
+  const date = prompt('Data para agendar (YYYY-MM-DD):', ds(new Date()));
+  if(!date) return;
+  const time = prompt('Horário (HH:MM):', '09:00');
+  if(!time) return;
+  const selecionados = bibItens.filter(i => bibSel.has(i.id));
+  let ok = 0;
+  for(const item of selecionados){
+    const story = {
+      id: Date.now() + Math.floor(Math.random()*999999),
+      url: item.url,
+      date: date,
+      time: time,
+      caption: item.caption || '',
+      repeat: 'none',
+      status: 'scheduled',
+      mediaType: item.mediaType,
+      link: '',
+      ig_id: IG_ID
+    };
+    await sbSave(story);
+    S.push(story);
+    ok++;
+  }
+  saveCache(S);
+  sv();
+  bibSel.clear();
+  showToast(ok + ' stories agendados!', 'success');
+  switchNav('month');
+}
+// ── FIM BIBLIOTECA ────────────────────────────────────────────────────────────
+
 // ── SELEÇÃO MÚLTIPLA CALENDÁRIO ──────────────────────────────────────────────
 const calSel = new Set();
 

@@ -284,6 +284,47 @@ app.delete("/schedule/:id", async (req, res) => {
   }
 });
 
+
+// ── BIBLIOTECA ────────────────────────────────────────────────────────────────
+app.get("/biblioteca", async (req, res) => {
+  try {
+    const tenantId = req.query.tenant_id || "kevin_admin";
+    const r = await axios.get(
+      `${SUPABASE_URL}/rest/v1/biblioteca_tfx?tenant_id=eq.${tenantId}&select=*&order=created_at.asc&limit=2000`,
+      { headers: sbHeaders }
+    );
+    const itens = r.data;
+    const pastas = [...new Set(itens.map(i => i.pasta))];
+    const pasta = req.query.pasta;
+    const filtrados = pasta ? itens.filter(i => i.pasta === pasta) : itens;
+    res.json({ pastas, itens: filtrados });
+  } catch(e){ res.status(500).json({ error: e.message }); }
+});
+
+app.post("/biblioteca", async (req, res) => {
+  try {
+    const tenantId = req.body.tenant_id || "kevin_admin";
+    const row = {
+      id: req.body.id,
+      tenant_id: tenantId,
+      pasta: req.body.pasta,
+      url: req.body.url,
+      mediaType: req.body.mediaType || "IMAGE",
+      caption: req.body.caption || ""
+    };
+    await axios.post(`${SUPABASE_URL}/rest/v1/biblioteca_tfx`, row, { headers: { ...sbHeaders, "Prefer": "return=minimal" } });
+    res.json({ success: true });
+  } catch(e){ res.status(500).json({ error: e.message }); }
+});
+
+app.delete("/biblioteca/:id", async (req, res) => {
+  try {
+    await axios.delete(`${SUPABASE_URL}/rest/v1/biblioteca_tfx?id=eq.${req.params.id}`, { headers: sbHeaders });
+    res.json({ success: true });
+  } catch(e){ res.status(500).json({ error: e.message }); }
+});
+// ── FIM BIBLIOTECA ────────────────────────────────────────────────────────────
+
 // UPLOAD to Cloudinary
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
