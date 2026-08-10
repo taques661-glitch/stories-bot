@@ -791,6 +791,36 @@ function switchNav(v){
 function switchTab(v){view=v;document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+v).classList.add('active');if(v==='month'){document.getElementById('nav-month').classList.add('active');document.getElementById('nav-week').classList.remove('active');}else{document.getElementById('nav-week').classList.add('active');document.getElementById('nav-month').classList.remove('active');}render();}
 function prevPeriod(){if(view==='month'){cur.setMonth(cur.getMonth()-1);renderSkeleton();loadStories(false);}else{cur.setDate(cur.getDate()-7);render();}}
 function nextPeriod(){if(view==='month'){cur.setMonth(cur.getMonth()+1);renderSkeleton();loadStories(false);}else{cur.setDate(cur.getDate()+7);render();}}
+// ── SELEÇÃO MÚLTIPLA CALENDÁRIO ──────────────────────────────────────────────
+const calSel = new Set();
+
+function toggleCalSel(id, el){
+  if(calSel.has(id)){calSel.delete(id);el.classList.remove('thumb-selected');}
+  else{calSel.add(id);el.classList.add('thumb-selected');}
+  updateCalSelBar();
+}
+
+function updateCalSelBar(){
+  let bar=document.getElementById('cal-sel-bar');
+  if(calSel.size===0){if(bar)bar.remove();return;}
+  if(!bar){bar=document.createElement('div');bar.id='cal-sel-bar';bar.className='cal-sel-bar';document.body.appendChild(bar);}
+  bar.innerHTML='<span>'+calSel.size+' selecionado(s)</span><button class="del-btn" onclick="deleteCalSel()">🗑 Excluir</button><button class="clr-btn" onclick="clearCalSel()">✕ Cancelar</button>';
+}
+
+function clearCalSel(){
+  calSel.clear();
+  document.querySelectorAll('.thumb-selected').forEach(el=>el.classList.remove('thumb-selected'));
+  const bar=document.getElementById('cal-sel-bar');if(bar)bar.remove();
+}
+
+function deleteCalSel(){
+  if(!calSel.size)return;
+  if(!confirm('Excluir '+calSel.size+' story(s)?'))return;
+  calSel.forEach(id=>{sbDel(id);S=S.filter(s=>s.id!==id);});
+  saveCache(S);sv();clearCalSel();render();stats();showToast('Stories excluídos!','success');
+}
+// ── FIM SELEÇÃO MÚLTIPLA ─────────────────────────────────────────────────────
+
 function render(){if(typeof clearCalSel==='function')clearCalSel();if(view==='month')renderMonth();else renderWeek();}
 function ds(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function renderMonth(){
@@ -1697,61 +1727,7 @@ function renderTrash(){
 // ── FIM LIXEIRA ───────────────────────────────────────────────────────────────
 
 
-// ── SELEÇÃO MÚLTIPLA CALENDÁRIO ──────────────────────────────────────────────
-const calSel = new Set(); // ids selecionados
 
-function toggleCalSel(id, el){
-  if(calSel.has(id)){
-    calSel.delete(id);
-    el.classList.remove('thumb-selected');
-  } else {
-    calSel.add(id);
-    el.classList.add('thumb-selected');
-  }
-  updateCalSelBar();
-}
-
-function updateCalSelBar(){
-  let bar = document.getElementById('cal-sel-bar');
-  if(calSel.size === 0){
-    if(bar) bar.remove();
-    return;
-  }
-  if(!bar){
-    bar = document.createElement('div');
-    bar.id = 'cal-sel-bar';
-    bar.className = 'cal-sel-bar';
-    document.body.appendChild(bar);
-  }
-  bar.innerHTML = `
-    <span>${calSel.size} selecionado(s)</span>
-    <button class="del-btn" onclick="deleteCalSel()">🗑 Excluir</button>
-    <button class="clr-btn" onclick="clearCalSel()">✕ Cancelar</button>
-  `;
-}
-
-function clearCalSel(){
-  calSel.clear();
-  document.querySelectorAll('.thumb-selected').forEach(el=>el.classList.remove('thumb-selected'));
-  const bar = document.getElementById('cal-sel-bar');
-  if(bar) bar.remove();
-}
-
-function deleteCalSel(){
-  if(!calSel.size) return;
-  if(!confirm('Excluir ' + calSel.size + ' story(s)?')) return;
-  calSel.forEach(id => {
-    sbDel(id);
-    S = S.filter(s => s.id !== id);
-  });
-  saveCache(S);
-  sv();
-  clearCalSel();
-  render();
-  stats();
-  showToast('Stories excluídos!', 'success');
-}
-// ── FIM SELEÇÃO MÚLTIPLA ─────────────────────────────────────────────────────
 
 // ── AUTENTICAÇÃO ─────────────────────────────────────────────────────────────
 const SENHA_HASH = '435570baf4bf829484895f44a869fbc1105f410b62b90e9ad20e8d910fc3a843'; // admin
