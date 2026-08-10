@@ -791,7 +791,7 @@ function switchNav(v){
 function switchTab(v){view=v;document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+v).classList.add('active');if(v==='month'){document.getElementById('nav-month').classList.add('active');document.getElementById('nav-week').classList.remove('active');}else{document.getElementById('nav-week').classList.add('active');document.getElementById('nav-month').classList.remove('active');}render();}
 function prevPeriod(){if(view==='month'){cur.setMonth(cur.getMonth()-1);renderSkeleton();loadStories(false);}else{cur.setDate(cur.getDate()-7);render();}}
 function nextPeriod(){if(view==='month'){cur.setMonth(cur.getMonth()+1);renderSkeleton();loadStories(false);}else{cur.setDate(cur.getDate()+7);render();}}
-function render(){clearCalSel();if(view==='month')renderMonth();else renderWeek();}
+function render(){if(typeof clearCalSel==='function')clearCalSel();if(view==='month')renderMonth();else renderWeek();}
 function ds(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function renderMonth(){
   const y=cur.getFullYear(),m=cur.getMonth();
