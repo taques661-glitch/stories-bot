@@ -219,7 +219,18 @@ app.get("/accounts", async (req, res) => {
 app.get("/schedule", async (req, res) => {
   const tenantId = req.query.tenant_id || "kevin_admin";
   try {
-    const rows = await sbGet(`tenant_id=eq.${tenantId}&select=*`);
+    // Paginação para superar limite de 1000 registros do Supabase
+    let rows = [];
+    let offset = 0;
+    while(true) {
+      const r = await axios.get(
+        `${SUPABASE_URL}/rest/v1/stories_tfx?tenant_id=eq.${tenantId}&select=*&order=date.asc,time.asc&limit=1000&offset=${offset}`,
+        { headers: sbHeaders }
+      );
+      rows = rows.concat(r.data);
+      if(r.data.length < 1000) break;
+      offset += 1000;
+    }
     const stories = rows.map(r => ({
       id: r.id, ig_id: r.ig_id, tenant_id: r.tenant_id,
       url: r.url, date: r.date, time: r.time,
