@@ -293,8 +293,9 @@ app.get("/biblioteca", async (req, res) => {
       `${SUPABASE_URL}/rest/v1/biblioteca_tfx?tenant_id=eq.${tenantId}&select=*&order=created_at.asc&limit=2000`,
       { headers: sbHeaders }
     );
-    const itens = r.data;
-    const pastas = [...new Set(itens.map(i => i.pasta))];
+    const todos = r.data;
+    const pastas = [...new Set(todos.map(i => i.pasta))];
+    const itens = todos.filter(i => i.url !== '__pasta__');
     const pasta = req.query.pasta;
     const filtrados = pasta ? itens.filter(i => i.pasta === pasta) : itens;
     res.json({ pastas, itens: filtrados });
