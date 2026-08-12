@@ -1089,19 +1089,20 @@ function mkCell(date,other){
     const colors={scheduled:'#e8c84a',publishing:'#e8c84a',published:'#4ade80',error:'#f87171',pending:'#e8c84a'};
     t.style.borderColor=colors[s.status]||'rgba(255,255,255,0.06)';
     if(s.url&&s.url.startsWith('http')){
-      if(s.mediaType==='VIDEO'){
-        const v=mkLazyVideo(s.url,'width:100%;height:100%;object-fit:cover;position:absolute;inset:0');
-        t.appendChild(v);
-        // Play icon overlay
+      // Usa img para tudo no calendário (mais leve)
+      const thumbEl=document.createElement('img');
+      if(s.mediaType==='VIDEO' && s.url && s.url.includes('cloudinary.com')){
+        thumbEl.src=s.url.replace('/video/upload/','/video/upload/so_1,f_jpg,w_200,q_50/').replace(/\.mp4$/,'.jpg').replace(/\.mov$/,'.jpg');
+        thumbEl.onerror=()=>{thumbEl.src='';t.innerHTML='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px">🎥</div>';};
         const ic=document.createElement('div');
-        ic.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;opacity:0.8';
+        ic.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;opacity:0.8;pointer-events:none';
         ic.textContent='▶';t.appendChild(ic);
       } else {
-        const img=document.createElement('img');
-        img.src=s.url;img.style.cssText='width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
-        img.onerror=()=>{t.textContent='🖼';t.style.display='flex';t.style.alignItems='center';t.style.justifyContent='center';};
-        t.appendChild(img);
+        thumbEl.src=s.url||'';
+        thumbEl.onerror=()=>{thumbEl.style.display='none';};
       }
+      thumbEl.style.cssText='width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
+      t.appendChild(thumbEl);
     } else {
       t.style.cssText+=';display:flex;align-items:center;justify-content:center;font-size:14px';
       t.textContent=s.mediaType==='VIDEO'?'🎥':'🖼';
@@ -1204,17 +1205,20 @@ function renderWeek(){
       const colors={scheduled:'#e8c84a',publishing:'#e8c84a',published:'#4ade80',error:'#f87171',pending:'#e8c84a'};
       t.style.borderColor=colors[s.status]||'rgba(255,255,255,0.06)';
       if(s.url&&s.url.startsWith('http')){
-        if(s.mediaType==='VIDEO'){
-          const v=mkLazyVideo(s.url,'width:100%;height:100%;object-fit:cover;position:absolute;inset:0');
-          t.appendChild(v);
+        // Usa img estática para performance
+        const tImg=document.createElement('img');
+        if(s.mediaType==='VIDEO' && s.url && s.url.includes('cloudinary.com')){
+          tImg.src=s.url.replace('/video/upload/','/video/upload/so_1,f_jpg,w_200,q_50/').replace(/\.mp4$/,'.jpg').replace(/\.mov$/,'.jpg');
+          tImg.onerror=()=>{tImg.style.display='none';t.innerHTML+='<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px">🎥</div>';};
           const ic=document.createElement('div');
-          ic.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;opacity:0.8';
+          ic.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;opacity:0.8;pointer-events:none';
           ic.textContent='▶';t.appendChild(ic);
         } else {
-          const img=document.createElement('img');
-          img.src=s.url;img.style.cssText='width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
-          img.onerror=()=>{t.textContent='🖼';};t.appendChild(img);
+          tImg.src=s.url||'';
+          tImg.onerror=()=>{tImg.style.display='none';};
         }
+        tImg.style.cssText='width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
+        t.appendChild(tImg);
       } else {
         t.style.cssText+=';display:flex;align-items:center;justify-content:center;font-size:16px';
         t.textContent=s.mediaType==='VIDEO'?'🎥':'🖼';
