@@ -433,8 +433,16 @@ app.get("/publish-due", async (req, res) => {
       try {
         let mediaUrl = cleanCloudinaryUrl(row.url);
         const isVideo = (row.mediaType || row.media_type) === "VIDEO";
-        if (isVideo && mediaUrl.includes('cloudinary.com') && !mediaUrl.endsWith('.mp4')) {
-          mediaUrl = mediaUrl.replace(/\.[^.]+$/, '.mp4');
+        if (mediaUrl.includes('cloudinary.com')) {
+          if (isVideo) {
+            // Força H264/30fps para vídeos
+            mediaUrl = mediaUrl.replace('/video/upload/', '/video/upload/vc_h264,fps_30,q_auto:good/');
+            if (!mediaUrl.endsWith('.mp4')) mediaUrl = mediaUrl.replace(/\.[^.]+$/, '.mp4');
+          } else {
+            // Força JPEG para imagens
+            mediaUrl = mediaUrl.replace('/image/upload/', '/image/upload/f_jpg,q_auto/');
+            mediaUrl = mediaUrl.replace(/\.[^.]+$/, '.jpg');
+          }
         }
         const containerRes = await axios.post(
           `https://graph.facebook.com/v19.0/${igId}/media`,
