@@ -526,7 +526,19 @@ async function checkTokenExpiry(){
     const diasRestantes = Math.floor((exp * 1000 - Date.now()) / 86400000);
     console.log(`[token] Expira em ${diasRestantes} dias`);
     if(diasRestantes <= 10){
-      console.warn(`[token] ⚠️ ATENÇÃO: Token expira em ${diasRestantes} dias! Renove em developers.facebook.com/tools/explorer`);
+      console.warn(`[token] ⚠️ ATENÇÃO: Token expira em ${diasRestantes} dias!`);
+      // Envia email via Resend
+      try {
+        await axios.post('https://api.resend.com/emails', {
+          from: 'Stories TFX <onboarding@resend.dev>',
+          to: 'taques661@gmail.com',
+          subject: `⚠️ Token Instagram expira em ${diasRestantes} dias!`,
+          html: `<h2>Atenção!</h2><p>Seu token do Instagram Stories TFX expira em <strong>${diasRestantes} dias</strong>.</p><p>Acesse <a href="https://developers.facebook.com/tools/explorer">Graph API Explorer</a> e renove antes que pare de postar.</p>`
+        }, {
+          headers: { 'Authorization': 'Bearer '+process.env.RESEND_API_KEY, 'Content-Type': 'application/json' }
+        });
+        console.log('[token] Email de alerta enviado!');
+      } catch(emailErr){ console.error('[token] Erro ao enviar email:', emailErr.message); }
     }
   } catch(e){
     console.error('[token] Erro ao verificar token:', e.message);
