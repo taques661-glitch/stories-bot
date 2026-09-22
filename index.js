@@ -511,4 +511,30 @@ setInterval(async () => {
   } catch(e) { console.error("Retry error:", e.message); }
 }, 60 * 60 * 1000);
 
+
+// ── ALERTA DE TOKEN ──────────────────────────────────────────────────────────
+async function checkTokenExpiry(){
+  try {
+    const token = IG_TOKEN_DEFAULT;
+    if(!token) return;
+    const r = await axios.get(
+      `https://graph.facebook.com/debug_token?input_token=${token}&access_token=${process.env.META_APP_ID||'940737518533672'}|${process.env.META_APP_SECRET}`,
+      { timeout: 10000 }
+    );
+    const exp = r.data?.data?.expires_at;
+    if(!exp) return;
+    const diasRestantes = Math.floor((exp * 1000 - Date.now()) / 86400000);
+    console.log(`[token] Expira em ${diasRestantes} dias`);
+    if(diasRestantes <= 10){
+      console.warn(`[token] ⚠️ ATENÇÃO: Token expira em ${diasRestantes} dias! Renove em developers.facebook.com/tools/explorer`);
+    }
+  } catch(e){
+    console.error('[token] Erro ao verificar token:', e.message);
+  }
+}
+// Verifica token 1x por dia
+setInterval(checkTokenExpiry, 24 * 60 * 60 * 1000);
+checkTokenExpiry(); // Verifica ao iniciar
+// ── FIM ALERTA DE TOKEN ───────────────────────────────────────────────────────
+
 app.listen(PORT, () => console.log(`Stories TFX Multi-tenant rodando na porta ${PORT}`));
